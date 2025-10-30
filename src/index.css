@@ -1,0 +1,27 @@
+/* 1) فعل Tailwind v4 */
+@import "tailwindcss";
+
+/* 2) ستايل عام اختياري مطابق لهويتك */
+html {
+  direction: rtl;
+} /* لأن الموقع عربي */
+body {
+  background: #f0eff6; /* light */
+  color: #141a37; /* dark */
+  font-family:
+    "Tajawal",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif;
+}
+
+/* مثال بسيط لحدود بنفس لون الـ palette */
+:root {
+  --border: #dbdaea;
+}
+.border-soft {
+  border-color: var(--border);
+}
