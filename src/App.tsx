@@ -24,7 +24,6 @@ const AdminCustomers = lazy(() => import("@/modules/admin/pages/Customers"));
 const AdminPayments = lazy(() => import("@/modules/admin/pages/Payments"));
 const AdminNotifications = lazy(() => import("@/modules/admin/pages/Notifications"));
 const AdminTerms = lazy(() => import("@/modules/admin/pages/Terms"));
-const AdminSettings = lazy(() => import("@/modules/admin/pages/Settings"));
 // Employer
 const EmployerProfile = lazy(() => import("@/modules/employer/pages/Profile"));
 const EmployerOrders = lazy(() => import("@/modules/employer/pages/Orders"));
@@ -42,16 +41,16 @@ const ProviderTerms = lazy(() => import("@/modules/provider/pages/Terms"));
 // Driver
 const DriverProfile = lazy(() => import("@/modules/driver/pages/Profile"));
 const DriverOrders = lazy(() => import("@/modules/driver/pages/Orders"));
-const DriverDrivers = lazy(() => import("@/modules/driver/pages/Drivers"));
 const DriverProof = lazy(() => import("@/modules/driver/pages/Proof"));
 const DriverBilling = lazy(() => import("@/modules/driver/pages/Billing"));
 const DriverTerms = lazy(() => import("@/modules/driver/pages/Terms"));
 // Client
 const ClientProfile = lazy(() => import("@/modules/client/pages/Profile"));
 const ClientShipments = lazy(() => import("@/modules/client/pages/Shipments"));
-const ClientAddresses = lazy(() => import("@/modules/client/pages/Addresses"));
+const ClientWallet = lazy(() => import("@/modules/client/pages/Wallet"));
 const ClientTerms = lazy(() => import("@/modules/client/pages/Terms"));
 const ClientTracking = lazy(() => import("@/modules/client/pages/Tracking"));
+const OrderConfirmation = lazy(() => import("@/modules/client/pages/OrderConfirmation"));
 // Landing
 const LandingPage = lazy(() => import("@/modules/landing/pages/LandingPage"));
 
@@ -127,14 +126,6 @@ export default function App() {
                 element={
                   <MainLayout>
                     <AdminTerms />
-                  </MainLayout>
-                }
-              />
-              <Route
-                path="/admin/settings"
-                element={
-                  <MainLayout>
-                    <AdminSettings />
                   </MainLayout>
                 }
               />
@@ -257,14 +248,6 @@ export default function App() {
                 }
               />
               <Route
-                path="/driver/drivers"
-                element={
-                  <MainLayout>
-                    <DriverDrivers />
-                  </MainLayout>
-                }
-              />
-              <Route
                 path="/driver/proof"
                 element={
                   <MainLayout>
@@ -307,10 +290,10 @@ export default function App() {
                 }
               />
               <Route
-                path="/client/addresses"
+                path="/client/wallet"
                 element={
                   <MainLayout>
-                    <ClientAddresses />
+                    <ClientWallet />
                   </MainLayout>
                 }
               />
@@ -327,6 +310,14 @@ export default function App() {
                 element={
                   <MainLayout>
                     <ClientTracking />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/client/order-confirmation"
+                element={
+                  <MainLayout>
+                    <OrderConfirmation />
                   </MainLayout>
                 }
               />

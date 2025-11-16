@@ -32,7 +32,6 @@ export const sidebarConfig: Record<RoleKey, SidebarItem[]> = {
     { key: "payments", label: "إدارة المدفوعات", path: "/admin/payments", icon: DollarOutlined },
     { key: "notifications", label: "الإشعارات", path: "/admin/notifications", icon: BellOutlined },
     { key: "terms", label: "الشروط والأحكام", path: "/admin/terms", icon: ReadOutlined },
-    { key: "settings", label: "الإعدادات", path: "/admin/settings", icon: SettingOutlined },
   ],
   employer: [
     { key: "profile", label: "معلوماتي", path: "/employer/profile", icon: IdcardOutlined },
@@ -73,7 +72,6 @@ export const sidebarConfig: Record<RoleKey, SidebarItem[]> = {
   driver: [
     { key: "profile", label: "معلوماتي", path: "/driver/profile", icon: IdcardOutlined },
     { key: "orders", label: "الطلبات", path: "/driver/orders", icon: ShoppingOutlined },
-    { key: "drivers", label: "إدارة السائقين", path: "/driver/drivers", icon: CarOutlined },
     { key: "proof", label: "إثبات التسليم", path: "/driver/proof", icon: CameraOutlined },
     { key: "billing", label: "الفاتورة والمدفوعات", path: "/driver/billing", icon: DollarOutlined },
     { key: "terms", label: "الشروط والأحكام", path: "/driver/terms", icon: ReadOutlined },
@@ -81,9 +79,8 @@ export const sidebarConfig: Record<RoleKey, SidebarItem[]> = {
   client: [
     { key: "profile", label: "معلوماتي", path: "/client/profile", icon: IdcardOutlined },
     { key: "shipments", label: "شحناتي", path: "/client/shipments", icon: ShoppingOutlined },
-    { key: "addresses", label: "عناويني", path: "/client/addresses", icon: EnvironmentOutlined },
+    { key: "wallet", label: "المحفظة", path: "/client/wallet", icon: DollarOutlined },
     { key: "terms", label: "الشروط والأحكام", path: "/client/terms", icon: ReadOutlined },
-    { key: "tracking", label: "تتبع الشحنة", path: "/client/tracking", icon: CarOutlined },
   ],
   guest: [
     { key: "login", label: "تسجيل الدخول", path: "/login", icon: IdcardOutlined },

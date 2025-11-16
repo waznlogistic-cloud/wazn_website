@@ -1,4 +1,4 @@
-import { Card, Input, Button, Checkbox, Upload, Typography } from "antd";
+import { Card, Input, Button, Checkbox, Upload, Typography, message } from "antd";
 import type { UploadFile, UploadProps } from "antd/es/upload/interface";
 import { InboxOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +7,8 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo, useState, type JSX } from "react";
 import AuthLayout from "@/modules/core/layouts/AuthLayout";
+import { register } from "@/services/auth";
+import { useAuth } from "@/contexts/authContext";
 
 const { Dragger } = Upload;
 const { Text } = Typography;
@@ -33,6 +35,8 @@ type Form = z.infer<typeof schema>;
 
 export default function RegisterDriver(): JSX.Element {
   const navigate = useNavigate();
+  const { setRole } = useAuth();
+  const [loading, setLoading] = useState(false);
 
   // Upload state (local preview only)
   const [drivingLicense, setDrivingLicense] = useState<UploadFile[]>([]);
@@ -48,7 +52,7 @@ export default function RegisterDriver(): JSX.Element {
   const {
     handleSubmit,
     control,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -72,7 +76,7 @@ export default function RegisterDriver(): JSX.Element {
     []
   );
 
-  function onSubmit(_: Form): void {
+  async function onSubmit(data: Form): Promise<void> {
     // تحقق إلزامي من المرفقات
     const errs = {
       drivingLicense: drivingLicense.length === 0,
@@ -83,8 +87,40 @@ export default function RegisterDriver(): JSX.Element {
 
     if (errs.drivingLicense || errs.vehicleLicense || errs.transportLicense) return;
 
-    // لاحقاً: إرسال البيانات للباك إند
-    // navigate("/somewhere");
+    try {
+      setLoading(true);
+      const result = await register({
+        email: data.email,
+        password: data.password,
+        phone: data.phone,
+        role: "driver",
+        metadata: {
+          full_name: data.driverName,
+          id_number: data.nationalId,
+        },
+      });
+      
+      // Set role in context immediately
+      setRole("driver");
+      
+      // Check if session exists (email confirmation might be disabled)
+      if (result.session) {
+        message.success("تم إنشاء الحساب بنجاح!");
+        // Small delay to ensure context is updated
+        setTimeout(() => {
+          navigate("/driver/profile");
+        }, 100);
+      } else {
+        // Email confirmation required
+        message.warning("تم إنشاء الحساب! يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب.");
+        navigate("/login");
+      }
+    } catch (error: any) {
+      message.error(error?.message || "حدث خطأ أثناء إنشاء الحساب");
+      console.error("Registration error:", error);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -291,7 +327,7 @@ export default function RegisterDriver(): JSX.Element {
                   type="primary"
                   htmlType="submit"
                   className="w-full sm:w-60"
-                  loading={isSubmitting}
+                  loading={loading}
                 >
                   إنشاء الحساب
                 </Button>

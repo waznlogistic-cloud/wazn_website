@@ -1,4 +1,4 @@
-import { Modal, Row, Col, Typography, Tag, Space, Divider } from "antd";
+import { Modal, Row, Col, Typography, Tag, Space, Divider, Button } from "antd";
 import type { Order } from "@/modules/core/types/order";
 
 const { Title, Text } = Typography;
@@ -7,6 +7,8 @@ export type OrderDetailsModalProps = {
   open: boolean;
   order: Order | null;
   onClose: () => void;
+  role?: "driver" | "provider" | "client" | "admin" | "employer";
+  onProofDelivery?: () => void;
 };
 
 function arabicStatus(s: Order["status"]) {
@@ -24,20 +26,38 @@ function arabicStatus(s: Order["status"]) {
   }
 }
 
-export default function OrderDetailsModal({ open, order, onClose }: OrderDetailsModalProps) {
+export default function OrderDetailsModal({
+  open,
+  order,
+  onClose,
+  role,
+  onProofDelivery,
+}: OrderDetailsModalProps) {
   if (!order) return null;
 
   return (
     <Modal
       open={open}
       onCancel={onClose}
-      footer={null}
+      footer={
+        role === "driver" && onProofDelivery ? (
+          <Button
+            type="primary"
+            size="large"
+            onClick={onProofDelivery}
+            className="rounded-lg"
+            style={{ backgroundColor: "#6E69D1", borderColor: "#6E69D1" }}
+          >
+            إثبات التسليم
+          </Button>
+        ) : null
+      }
       closable
       centered
       width={720}
       title={
         <div className="flex items-center justify-center">
-          <Tag style={{ fontSize: 14, paddingInline: 16 }}>شحنة رقم: {order.id}</Tag>
+          <Tag style={{ fontSize: 14, paddingInline: 16 }}>شحنة رقم: {order.trackingNo || order.id}</Tag>
         </div>
       }
     >
@@ -64,6 +84,14 @@ export default function OrderDetailsModal({ open, order, onClose }: OrderDetails
             <Title level={5} className="!mb-1">
               بيانات الاستلام:
             </Title>
+            <div>
+              <Text type="secondary">اسم المستلم: </Text>
+              {order.shipperName ?? "-"}
+            </div>
+            <div>
+              <Text type="secondary">رقم الهاتف: </Text>
+              {order.shipperPhone ?? "-"}
+            </div>
             <div>
               <Text type="secondary">عنوان الاستلام: </Text>
               {order.receiverAddress ?? "-"}

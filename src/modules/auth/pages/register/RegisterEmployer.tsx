@@ -1,16 +1,18 @@
-import { Card, Input, Button, Checkbox } from "antd";
+import { Card, Input, Button, Checkbox, message } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import AuthLayout from "@/modules/core/layouts/AuthLayout";
+import { register } from "@/services/auth";
+import { useAuth } from "@/contexts/authContext";
+import { useState } from "react";
 
 /* ----------------------------- Validation ----------------------------- */
 const schema = z.object({
   companyName: z.string().min(3, "اسم الشركة مطلوب"),
-  commercialReg: z.string().min(5, "أدخل السجل التجاري"),
+  documentOrCommercialReg: z.string().min(5, "أدخل رقم الوثيقة/السجل التجاري"),
   taxNumber: z.string().min(5, "أدخل الرقم الضريبي"),
-  documentNumber: z.string().min(5, "أدخل رقم الوثيقة"),
   address: z.string().min(3, "العنوان مطلوب"),
   phone: z.string().regex(/^05\d{8}$/, "أدخل رقم صحيح يبدأ بـ 05 (10 خانات)"),
   email: z.string().email("أدخل بريد إلكتروني صحيح"),
@@ -24,18 +26,19 @@ type Form = z.infer<typeof schema>;
 
 export default function RegisterEmployer() {
   const navigate = useNavigate();
+  const { setRole } = useAuth();
+  const [loading, setLoading] = useState(false);
 
   const {
     control,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: {
       companyName: "",
-      commercialReg: "",
+      documentOrCommercialReg: "",
       taxNumber: "",
-      documentNumber: "",
       address: "",
       phone: "",
       email: "",
@@ -45,8 +48,64 @@ export default function RegisterEmployer() {
     mode: "onSubmit",
   });
 
-  const onSubmit = (_: Form) => {
-    // لاحقاً: إرسال البيانات للباك إند
+  const onSubmit = async (data: Form) => {
+    try {
+      setLoading(true);
+      console.log("Starting registration...");
+      
+      const result = await register({
+        email: data.email,
+        password: data.password,
+        phone: data.phone,
+        role: "employer",
+        metadata: {
+          full_name: data.companyName,
+          id_number: data.documentOrCommercialReg,
+          address: data.address,
+          company_name: data.companyName,
+          commercial_registration: data.documentOrCommercialReg,
+          tax_number: data.taxNumber,
+        },
+      });
+      
+      console.log("Registration result:", result);
+      console.log("Session exists:", !!result.session);
+      console.log("User created:", !!result.user);
+      
+      // Set role in context immediately
+      setRole("employer");
+      
+      // Check if session exists (email confirmation might be disabled)
+      if (result.session) {
+        console.log("Session found, redirecting to profile...");
+        message.success("تم إنشاء الحساب بنجاح!");
+        // Small delay to ensure context is updated
+        setTimeout(() => {
+          navigate("/employer/profile");
+        }, 100);
+      } else if (result.user) {
+        // User created but no session (email confirmation required)
+        console.log("User created but no session - email confirmation required");
+        message.warning("تم إنشاء الحساب! يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب.");
+        // Still redirect to profile after a delay to allow user to see the message
+        setTimeout(() => {
+          navigate("/login");
+        }, 2000);
+      } else {
+        console.error("No user or session returned");
+        message.error("حدث خطأ أثناء إنشاء الحساب. يرجى المحاولة مرة أخرى.");
+      }
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        code: error?.code,
+        status: error?.status,
+      });
+      message.error(error?.message || "حدث خطأ أثناء إنشاء الحساب");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -73,41 +132,22 @@ export default function RegisterEmployer() {
               )}
             </div>
 
-            {/* السجل التجاري */}
+            {/* رقم الوثيقة/السجل التجاري */}
             <div>
-              <label className="block text-sm mb-1">السجل التجاري</label>
+              <label className="block text-sm mb-1">رقم الوثيقة/السجل التجاري</label>
               <Controller
-                name="commercialReg"
+                name="documentOrCommercialReg"
                 control={control}
                 render={({ field }) => (
                   <Input
                     {...field}
-                    placeholder="CR 000 000 0000"
-                    status={errors.commercialReg ? "error" : undefined}
+                    placeholder="000 000 000 أو CR 000 000 0000"
+                    status={errors.documentOrCommercialReg ? "error" : undefined}
                   />
                 )}
               />
-              {errors.commercialReg && (
-                <p className="text-red-600 text-xs mt-1">{errors.commercialReg.message}</p>
-              )}
-            </div>
-
-            {/* رقم الوثيقة */}
-            <div>
-              <label className="block text-sm mb-1">رقم الوثيقة</label>
-              <Controller
-                name="documentNumber"
-                control={control}
-                render={({ field }) => (
-                  <Input
-                    {...field}
-                    placeholder="000 000 000"
-                    status={errors.documentNumber ? "error" : undefined}
-                  />
-                )}
-              />
-              {errors.documentNumber && (
-                <p className="text-red-600 text-xs mt-1">{errors.documentNumber.message}</p>
+              {errors.documentOrCommercialReg && (
+                <p className="text-red-600 text-xs mt-1">{errors.documentOrCommercialReg.message}</p>
               )}
             </div>
 
@@ -228,7 +268,7 @@ export default function RegisterEmployer() {
                   type="primary"
                   htmlType="submit"
                   className="w-full sm:w-60"
-                  loading={isSubmitting}
+                  loading={loading}
                 >
                   إنشاء الحساب
                 </Button>

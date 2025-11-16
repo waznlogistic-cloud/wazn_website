@@ -1,5 +1,5 @@
 // src/modules/auth/pages/register/RegisterProvider.tsx
-import { Card, Input, Button, Checkbox, Upload, Typography } from "antd";
+import { Card, Input, Button, Checkbox, Upload, Typography, message } from "antd";
 import { useNavigate } from "react-router-dom";
 import type { UploadFile } from "antd/es/upload/interface";
 import { InboxOutlined } from "@ant-design/icons";
@@ -8,6 +8,8 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import AuthLayout from "@/modules/core/layouts/AuthLayout";
+import { register } from "@/services/auth";
+import { useAuth } from "@/contexts/authContext";
 
 const { Dragger } = Upload;
 const { Text } = Typography;
@@ -15,7 +17,7 @@ const { Text } = Typography;
 /* ----------------------------- Validation ----------------------------- */
 const schema = z.object({
   providerName: z.string().min(3, "اسم المنشأة/المزوّد مطلوب"),
-  documentNumber: z.string().min(1, "أدخل رقم الوثيقة"),
+  commercialReg: z.string().min(1, "أدخل السجل التجاري"),
   phone: z.string().regex(/^05\d{8}$/, "أدخل رقم صحيح يبدأ بـ 05 (10 خانات)"),
   email: z.string().email("أدخل بريد إلكتروني صحيح"),
   password: z.string().min(6, "كلمة المرور 6 خانات على الأقل"),
@@ -27,6 +29,8 @@ type Form = z.infer<typeof schema>;
 
 export default function RegisterProvider() {
   const navigate = useNavigate();
+  const { setRole } = useAuth();
+  const [loading, setLoading] = useState(false);
 
   /* ----------------------------- Upload state ----------------------------- */
   const [tagFile, setTagFile] = useState<UploadFile[]>([]);
@@ -42,12 +46,12 @@ export default function RegisterProvider() {
   const {
     handleSubmit,
     control,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: {
       providerName: "",
-      documentNumber: "",
+      commercialReg: "",
       phone: "",
       email: "",
       password: "",
@@ -56,17 +60,60 @@ export default function RegisterProvider() {
     mode: "onSubmit",
   });
 
-  const onSubmit = (_: Form) => {
-    // تحقق من إلزامية المرفقات
+  const onSubmit = async (data: Form) => {
+    // تحقق من إلزامية المرفقات (TAG ووثيقة التأمين إجباريان، الرخصة اختيارية)
     const errs = {
       tagFile: tagFile.length === 0,
-      licenseFile: licenseFile.length === 0,
+      licenseFile: false, // الرخصة اختيارية الآن
       insuranceFile: insuranceFile.length === 0,
     };
     setUploadErrors(errs);
-    if (errs.tagFile || errs.licenseFile || errs.insuranceFile) return;
+    if (errs.tagFile || errs.insuranceFile) return;
 
-    // لاحقاً: استدعاء API للتسجيل
+    try {
+      setLoading(true);
+      const result = await register({
+        email: data.email,
+        password: data.password,
+        phone: data.phone,
+        role: "provider",
+        metadata: {
+          full_name: data.providerName,
+          id_number: data.commercialReg,
+          company_name: data.providerName,
+          commercial_registration: data.commercialReg,
+        },
+      });
+      
+      // Set role in context immediately
+      setRole("provider");
+      
+      // Check if session exists (email confirmation might be disabled)
+      if (result.session) {
+        message.success("تم إنشاء الحساب بنجاح!");
+        // Small delay to ensure context is updated
+        setTimeout(() => {
+          navigate("/provider/profile");
+        }, 100);
+      } else {
+        // Email confirmation required
+        message.warning("تم إنشاء الحساب! يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب.");
+        navigate("/login");
+      }
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      const errorMessage = error?.message || "حدث خطأ أثناء إنشاء الحساب";
+      message.error(errorMessage);
+      
+      // Show more detailed error if available
+      if (error?.code === "23505") {
+        message.error("البريد الإلكتروني أو رقم الهاتف مستخدم بالفعل");
+      } else if (error?.code === "23514") {
+        message.error("البيانات المدخلة غير صحيحة");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const commonDraggerProps = {
@@ -118,7 +165,7 @@ export default function RegisterProvider() {
               </div>
 
               <div>
-                <label className="block text-sm mb-1">الرخصة</label>
+                <label className="block text-sm mb-1">الرخصة (اختياري)</label>
                 <Dragger
                   {...commonDraggerProps}
                   fileList={licenseFile}
@@ -132,9 +179,6 @@ export default function RegisterProvider() {
                   </p>
                   <p className="ant-upload-text">اضغط للتحميل</p>
                 </Dragger>
-                {uploadErrors.licenseFile && (
-                  <p className="text-red-600 text-xs mt-1">ملف الرخصة مطلوب</p>
-                )}
               </div>
 
               <div>
@@ -180,21 +224,21 @@ export default function RegisterProvider() {
               </div>
 
               <div>
-                <label className="block text-sm mb-1">رقم الوثيقة</label>
+                <label className="block text-sm mb-1">السجل التجاري</label>
                 <Controller
-                  name="documentNumber"
+                  name="commercialReg"
                   control={control}
                   render={({ field }) => (
                     <Input
                       {...field}
-                      placeholder="000 000 000"
-                      status={errors.documentNumber ? "error" : undefined}
+                      placeholder="CR 000 000 0000"
+                      status={errors.commercialReg ? "error" : undefined}
                       autoComplete="off"
                     />
                   )}
                 />
-                {errors.documentNumber && (
-                  <p className="text-red-600 text-xs mt-1">{errors.documentNumber.message}</p>
+                {errors.commercialReg && (
+                  <p className="text-red-600 text-xs mt-1">{errors.commercialReg.message}</p>
                 )}
               </div>
 
@@ -282,7 +326,7 @@ export default function RegisterProvider() {
                   type="primary"
                   htmlType="submit"
                   className="w-full sm:w-60"
-                  loading={isSubmitting}
+                  loading={loading}
                 >
                   إنشاء الحساب
                 </Button>

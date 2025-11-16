@@ -25,7 +25,9 @@ export default function Sidebar({ role, onCollapsedChange }: Props) {
   const items = useMemo(() => sidebarConfig[role], [role]);
 
   const selectedKey = useMemo(() => {
-    const active = items.find((it) => location.pathname.startsWith(it.path));
+    // Sort by path length (longest first) to match more specific paths first
+    const sortedItems = [...items].sort((a, b) => b.path.length - a.path.length);
+    const active = sortedItems.find((it) => location.pathname.startsWith(it.path));
     return active?.key ?? items[0]?.key;
   }, [items, location.pathname]);
 

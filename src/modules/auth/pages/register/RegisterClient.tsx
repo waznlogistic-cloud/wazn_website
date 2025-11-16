@@ -1,9 +1,12 @@
-import { Card, Input, Button, Checkbox } from "antd";
+import { Card, Input, Button, Checkbox, message } from "antd";
 import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import AuthLayout from "@/modules/core/layouts/AuthLayout";
+import { register } from "@/services/auth";
+import { useAuth } from "@/contexts/authContext";
+import { useState } from "react";
 
 /* ----------------------------- Validation ----------------------------- */
 // يدعم 05xxxxxxxx أو +9665xxxxxxxx
@@ -28,11 +31,13 @@ type Form = z.infer<typeof schema>;
 
 export default function RegisterClient() {
   const navigate = useNavigate();
+  const { setRole } = useAuth();
+  const [loading, setLoading] = useState(false);
 
   const {
     control,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -47,9 +52,42 @@ export default function RegisterClient() {
     mode: "onSubmit",
   });
 
-  const onSubmit = (data: Form) => {
-    // مؤقتاً بدون باك إند
-    // console.log("FORM OK", data);
+  const onSubmit = async (data: Form) => {
+    try {
+      setLoading(true);
+      const result = await register({
+        email: data.email,
+        password: data.password,
+        phone: data.phone,
+        role: "client",
+        metadata: {
+          full_name: data.name,
+          id_number: data.idNumber,
+          address: data.address,
+        },
+      });
+      
+      // Set role in context immediately
+      setRole("client");
+      
+      // Check if session exists (email confirmation might be disabled)
+      if (result.session) {
+        message.success("تم إنشاء الحساب بنجاح!");
+        // Small delay to ensure context is updated
+        setTimeout(() => {
+          navigate("/client/profile");
+        }, 100);
+      } else {
+        // Email confirmation required
+        message.warning("تم إنشاء الحساب! يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب.");
+        navigate("/login");
+      }
+    } catch (error: any) {
+      message.error(error?.message || "حدث خطأ أثناء إنشاء الحساب");
+      console.error("Registration error:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -194,7 +232,7 @@ export default function RegisterClient() {
                   type="primary"
                   htmlType="submit"
                   className="w-full sm:w-60"
-                  loading={isSubmitting}
+                  loading={loading}
                 >
                   إنشاء الحساب
                 </Button>

@@ -42,7 +42,7 @@ export default function UserTypeSelection() {
       <div className="w-full flex items-center justify-between mb-6">
         <div />
         <h2 className="text-lg font-semibold text-gray-700">
-          لديك حساب مسبق؟ سجل دخولك الآن أو أنشئ حساب
+          لديك حساب مسبق؟ سجل دخولك
         </h2>
       </div>
 

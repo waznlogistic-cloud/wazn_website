@@ -1,4 +1,5 @@
-import { Button, Card } from "antd";
+import { Button, Card, message } from "antd";
+import { useNavigate } from "react-router-dom";
 import { getAssetUrl } from "@/modules/landing/components/useAssetUrl";
 import LogoStrip from "@/modules/landing/components/LogoStrip";
 import Logo from "@/components/Logo";
@@ -8,8 +9,35 @@ const partners = ["dhl", "redbox", "aramex", "marsool", "transoor", "mekhbaz"];
 const supporters = ["modon", "kaust", "waddi", "monshaat", "ubt"];
 
 export default function LandingPage() {
+  const navigate = useNavigate();
   const sea = getAssetUrl("seabackground") || "";
   const heroOverlay = getAssetUrl("landing"); // optional decorative image
+
+  const handleGetStarted = () => {
+    // Navigate to user type selection
+    navigate("/select-user");
+  };
+
+  const handleNewsletterSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    
+    if (!email || !email.includes("@")) {
+      message.error("يرجى إدخال بريد إلكتروني صحيح");
+      return;
+    }
+    
+    // TODO: Connect to newsletter API
+    message.success("تم الاشتراك في النشرة البريدية بنجاح!");
+    e.currentTarget.reset();
+  };
+
+  const handleCreateOrder = () => {
+    // Check if user is logged in, if not redirect to login
+    // For now, redirect to login - user can create order after login
+    navigate("/login");
+  };
 
   return (
     <div dir="rtl" className="min-h-screen bg-white text-gray-900">
@@ -17,12 +45,14 @@ export default function LandingPage() {
       <header className="w-full bg-[#0E2A4D] text-white">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Logo className="h-8 w-auto" />
+            <button onClick={() => navigate("/")} className="cursor-pointer">
+              <Logo className="h-8 w-auto" />
+            </button>
           </div>
           <div className="flex items-center gap-2">
-            <Button href="/login">تسجيل الدخول</Button>
-            <Button href="/select-user">إنشاء حساب</Button>
-            <Button type="primary" href="/orders/new">
+            <Button onClick={() => navigate("/login")}>تسجيل الدخول</Button>
+            <Button onClick={() => navigate("/select-user")}>إنشاء حساب</Button>
+            <Button type="primary" onClick={handleCreateOrder}>
               إنشاء طلب
             </Button>
           </div>
@@ -50,7 +80,7 @@ export default function LandingPage() {
           <p className="max-w-2xl text-white/90">
             نُشّط عملياتك اللوجستية بتقنيات متطورة وخدمات متخصصة
           </p>
-          <Button type="primary" size="large" className="mt-6">
+          <Button type="primary" size="large" className="mt-6" onClick={handleGetStarted}>
             ابدأ الآن
           </Button>
         </div>
@@ -122,10 +152,16 @@ export default function LandingPage() {
         <h3 className="text-xl font-semibold mb-2">النشرة البريدية</h3>
         <p className="text-gray-600 mb-4">اشترك في نشرتنا البريدية لتلقي الخدمات والعروض الخاصة</p>
         <form
-          onSubmit={(e) => e.preventDefault()}
+          onSubmit={handleNewsletterSubmit}
           className="flex flex-col sm:flex-row gap-3 max-w-xl"
         >
-          <input className="flex-1 border rounded-md px-3 py-2" placeholder="بريدك الإلكتروني" />
+          <input
+            name="email"
+            type="email"
+            className="flex-1 border rounded-md px-3 py-2"
+            placeholder="بريدك الإلكتروني"
+            required
+          />
           <Button type="primary" htmlType="submit">
             اشتراك
           </Button>
