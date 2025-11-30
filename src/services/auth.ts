@@ -80,12 +80,6 @@ export async function register(data: RegisterData) {
         address: data.metadata?.address,
       };
 
-      // Add employer-specific fields if role is employer
-      if (data.role === "employer") {
-        profileData.commercial_registration = data.metadata?.commercial_registration;
-        profileData.tax_number = data.metadata?.tax_number;
-      }
-
       const { error: profileError } = await supabase.from("profiles").insert(profileData);
 
       if (profileError) {
@@ -111,6 +105,26 @@ export async function register(data: RegisterData) {
           // If provider already exists, try to update it
           if (providerError.code !== "23505") {
             throw providerError;
+          }
+        }
+      }
+
+      // If employer, create employer record
+      if (data.role === "employer" && data.metadata?.company_name) {
+        const { error: employerError } = await supabase.from("employers").insert({
+          id: authData.user.id,
+          company_name: data.metadata.company_name,
+          commercial_registration: data.metadata.commercial_registration,
+          tax_number: data.metadata.tax_number,
+          address: data.metadata.address,
+          activity_type: data.metadata.activity_type,
+        }).select().single();
+
+        if (employerError) {
+          console.error("Error creating employer:", employerError);
+          // If employer already exists, try to update it
+          if (employerError.code !== "23505") {
+            throw employerError;
           }
         }
       }

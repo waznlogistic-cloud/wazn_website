@@ -57,14 +57,17 @@ VITE_SUPABASE_ANON_KEY=your-anon-key-here
 ## 📋 Step 5: Configure Authentication
 
 1. Go to **Authentication** → **Settings**
-2. **Disable Email Confirmation** (for development):
-   - Scroll to "Email Auth"
-   - Turn OFF "Enable email confirmations"
-   - This allows immediate login after registration
+2. **Enable Phone Authentication** (for phone confirmation):
+   - Scroll to "Phone Auth"
+   - Enable Phone provider
+   - Turn ON "Enable phone confirmations"
+   - Users will receive SMS code to verify their phone number
 
-3. **Enable Providers:**
-   - Email provider should be enabled by default
-   - Phone provider (optional)
+3. **Configure Email Auth:**
+   - Email provider should be enabled by default (for login)
+   - Turn OFF "Enable email confirmations" (since using phone confirmation)
+
+**Note:** Account confirmation will be done through phone numbers (SMS), not email.
 
 ---
 
@@ -130,8 +133,10 @@ CREATE POLICY "Users can read own files"
 - ✅ Restart dev server
 
 ### Can't login after registration
-- ✅ Disable email confirmation in Authentication → Settings
-- ✅ Or check email for confirmation link
+- ✅ Check if phone confirmation is enabled
+- ✅ User should receive SMS code to verify phone number
+- ✅ Make sure phone number is verified before login
+- ✅ Check Supabase Dashboard → Authentication → Users to see verification status
 
 ### Database errors
 - ✅ Verify tables exist in Table Editor

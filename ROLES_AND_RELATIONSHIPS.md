@@ -327,26 +327,30 @@
 
 **Features:**
 - ✅ **Profile** - Company information
+  - Company name, commercial registration/tax number
   - Personal information (name, ID, birth date, mobile, email)
+  - Password update functionality
   - Edit/Save functionality
   
 - ✅ **Orders** - View company orders
-  - Orders table
+  - Orders table with loading/error/empty states
   - Order number, shipment type, dates
   - Company, status
   - View order details
+  - Connected to Supabase
   
 - ✅ **Create Order** - Create new business shipment
   - Shipment details (date, type, weight, delivery method)
   - Sender information (name, phone, address)
   - Recipient information (name, phone, address)
-  - Submit order
+  - Submit order (connected to Supabase)
   
 - ✅ **Billing** - Company financial management
   - Summary cards (total invoices, paid, due)
   - Invoices table
   - Invoice number, date, amount, status
-  - View and download invoices
+  - View invoice details (modal)
+  - Download invoices (HTML generation)
   
 - ✅ **Terms & Conditions**
 

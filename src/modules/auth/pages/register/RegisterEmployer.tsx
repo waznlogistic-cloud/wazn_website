@@ -84,10 +84,10 @@ export default function RegisterEmployer() {
           navigate("/employer/profile");
         }, 100);
       } else if (result.user) {
-        // User created but no session (email confirmation required)
-        console.log("User created but no session - email confirmation required");
-        message.warning("تم إنشاء الحساب! يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب.");
-        // Still redirect to profile after a delay to allow user to see the message
+        // User created but no session (phone confirmation required)
+        console.log("User created but no session - phone confirmation required");
+        message.warning("تم إنشاء الحساب! يرجى التحقق من رقم الهاتف لتأكيد الحساب. سيتم إرسال رمز التحقق عبر SMS.");
+        // Redirect to OTP verification page or login
         setTimeout(() => {
           navigate("/login");
         }, 2000);

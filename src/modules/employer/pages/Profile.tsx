@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Form, Input, Button, Space, message, Tag, Modal } from "antd";
 import { CheckCircleOutlined } from "@ant-design/icons";
 import { useAuth } from "@/contexts/authContext";
-import { getProfile, updateProfile } from "@/services/profiles";
+import { getProfile, updateProfile, getEmployerProfile } from "@/services/profiles";
 import { supabase } from "@/lib/supabase";
 import { updatePassword } from "@/services/auth";
 
@@ -25,13 +25,16 @@ export default function Profile() {
     if (!user) return;
     try {
       setLoading(true);
-      const profile = await getProfile(user.id);
+      const [profile, employer] = await Promise.all([
+        getProfile(user.id),
+        getEmployerProfile(user.id),
+      ]);
 
       if (profile) {
         form.setFieldsValue({
-          companyName: profile.full_name || "",
-          commercialReg: (profile as any).commercial_registration || "",
-          taxNumber: (profile as any).tax_number || "",
+          companyName: employer?.company_name || profile.full_name || "",
+          commercialReg: employer?.commercial_registration || "",
+          taxNumber: employer?.tax_number || "",
           documentNumber: profile.id_number || "",
           phone: profile.phone || "",
           email: profile.email || "",
@@ -66,13 +69,10 @@ export default function Profile() {
       const values = await form.validateFields();
       setLoading(true);
       
-      // Update profile with all fields
-      const { error: updateError } = await supabase
+      // Update profile table (personal info)
+      const { error: profileError } = await supabase
         .from("profiles")
         .update({
-          full_name: values.companyName,
-          commercial_registration: values.commercialReg,
-          tax_number: values.taxNumber,
           id_number: values.documentNumber,
           phone: values.phone,
           email: values.email,
@@ -80,8 +80,25 @@ export default function Profile() {
         })
         .eq("id", user.id);
 
-      if (updateError) {
-        throw updateError;
+      if (profileError) {
+        throw profileError;
+      }
+
+      // Update or create employer table (company info)
+      const { error: employerError } = await supabase
+        .from("employers")
+        .upsert({
+          id: user.id,
+          company_name: values.companyName,
+          commercial_registration: values.commercialReg,
+          tax_number: values.taxNumber,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: "id"
+        });
+
+      if (employerError) {
+        throw employerError;
       }
 
       message.success("تم حفظ البيانات بنجاح!");

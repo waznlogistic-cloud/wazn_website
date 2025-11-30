@@ -47,7 +47,7 @@ export default function Login() {
       });
       
       if (!loginResult.session) {
-        message.warning("يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب أولاً");
+        message.warning("يرجى التحقق من رقم الهاتف لتأكيد الحساب أولاً");
         return;
       }
       
@@ -73,8 +73,8 @@ export default function Login() {
       if (error?.message) {
         if (error.message.includes("Invalid login credentials")) {
           errorMessage = "البريد الإلكتروني أو كلمة المرور غير صحيحة";
-        } else if (error.message.includes("Email not confirmed")) {
-          errorMessage = "يرجى التحقق من بريدك الإلكتروني لتأكيد الحساب";
+        } else         if (error.message.includes("Email not confirmed") || error.message.includes("Phone not confirmed")) {
+          errorMessage = "يرجى التحقق من رقم الهاتف لتأكيد الحساب";
         } else {
           errorMessage = error.message;
         }

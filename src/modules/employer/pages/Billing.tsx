@@ -93,6 +93,7 @@ export default function Billing() {
           </div>
         </div>
         <div class="details">
+        
           <table>
             <thead>
               <tr>

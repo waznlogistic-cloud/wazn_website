@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   role wazn_user_role NOT NULL DEFAULT 'client',
   full_name TEXT,
-  phone TEXT,
-  email TEXT,
+  phone TEXT NOT NULL, -- Required for login
+  email TEXT NOT NULL, -- Required for login
   id_number TEXT,
   date_of_birth DATE,
   nationality TEXT,
@@ -39,6 +39,21 @@ CREATE TABLE IF NOT EXISTS public.providers (
   tax_number TEXT,
   activity_type TEXT,
   rating DECIMAL(3, 2) DEFAULT 0.00,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
+-- Step 3.5: EMPLOYERS TABLE
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.employers (
+  id UUID REFERENCES public.profiles(id) ON DELETE CASCADE PRIMARY KEY,
+  company_name TEXT NOT NULL,
+  commercial_registration TEXT,
+  tax_number TEXT,
+  activity_type TEXT,
+  rating DECIMAL(3, 2) DEFAULT 0.00,
+  address TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

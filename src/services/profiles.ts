@@ -14,6 +14,18 @@ export interface Profile {
   updated_at?: string;
 }
 
+export interface EmployerProfile {
+  id: string;
+  company_name: string;
+  commercial_registration?: string;
+  tax_number?: string;
+  activity_type?: string;
+  rating?: number;
+  address?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 /**
  * Get current user's profile
  */
@@ -63,5 +75,22 @@ export async function getAllProfiles(): Promise<Profile[]> {
 
   if (error) throw error;
   return (data || []) as Profile[];
+}
+
+/**
+ * Get employer profile data
+ */
+export async function getEmployerProfile(userId: string): Promise<EmployerProfile | null> {
+  const { data, error } = await supabase
+    .from("employers")
+    .select("*")
+    .eq("id", userId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return null; // Not found
+    throw error;
+  }
+  return data as EmployerProfile;
 }
 
