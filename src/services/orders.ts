@@ -22,7 +22,15 @@ export interface CreateOrderData {
  * Get orders based on user role
  */
 export async function getOrders(role: string, userId: string): Promise<Order[]> {
-  let query = supabase.from("orders").select("*");
+  // Join with providers table to get company name
+  let query = supabase
+    .from("orders")
+    .select(`
+      *,
+      providers (
+        company_name
+      )
+    `);
 
   if (role === "client") {
     query = query.eq("client_id", userId);
@@ -37,8 +45,16 @@ export async function getOrders(role: string, userId: string): Promise<Order[]> 
 
   const { data, error } = await query.order("created_at", { ascending: false });
 
-  if (error) throw error;
-  return (data || []) as Order[];
+  if (error) {
+    console.error("Error fetching orders:", error);
+    throw error;
+  }
+  
+  // Transform data to include company name from providers relation
+  return (data || []).map((order: any) => ({
+    ...order,
+    company: order.providers?.company_name || "-",
+  })) as Order[];
 }
 
 /**

@@ -14,6 +14,7 @@ export type Order = {
   deliveredAt?: string; // For compatibility
   company?: string;
   price?: number;
+  weight?: number;
   shipperName?: string;
   shipperPhone?: string;
   sender_name?: string;

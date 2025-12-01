@@ -1,5 +1,6 @@
 import { Modal, Row, Col, Typography, Tag, Space, Divider, Button } from "antd";
 import type { Order } from "@/modules/core/types/order";
+import dayjs from "dayjs";
 
 const { Title, Text } = Typography;
 
@@ -24,6 +25,16 @@ function arabicStatus(s: Order["status"]) {
     default:
       return s;
   }
+}
+
+function getShipTypeText(shipType?: string) {
+  const types: Record<string, string> = {
+    document: "مستندات",
+    package: "طرد",
+    fragile: "قابل للكسر",
+    heavy: "ثقيل",
+  };
+  return types[shipType || ""] || shipType || "-";
 }
 
 export default function OrderDetailsModal({
@@ -69,15 +80,15 @@ export default function OrderDetailsModal({
             </Title>
             <div>
               <Text type="secondary">اسم المرسل: </Text>
-              {order.shipperName ?? "-"}
+              <Text strong>{order.sender_name || order.senderName || order.shipperName || "-"}</Text>
             </div>
             <div>
               <Text type="secondary">رقم الهاتف: </Text>
-              {order.shipperPhone ?? "-"}
+              <Text strong>{order.sender_phone || order.senderPhone || order.shipperPhone || "-"}</Text>
             </div>
             <div>
               <Text type="secondary">عنوان الإرسال: </Text>
-              {order.senderAddress ?? "-"}
+              <Text strong>{order.sender_address || order.senderAddress || "-"}</Text>
             </div>
           </Col>
           <Col xs={24} md={12}>
@@ -86,15 +97,15 @@ export default function OrderDetailsModal({
             </Title>
             <div>
               <Text type="secondary">اسم المستلم: </Text>
-              {order.shipperName ?? "-"}
+              <Text strong>{order.receiver_name || order.receiverName || "-"}</Text>
             </div>
             <div>
               <Text type="secondary">رقم الهاتف: </Text>
-              {order.shipperPhone ?? "-"}
+              <Text strong>{order.receiver_phone || order.receiverPhone || "-"}</Text>
             </div>
             <div>
               <Text type="secondary">عنوان الاستلام: </Text>
-              {order.receiverAddress ?? "-"}
+              <Text strong>{order.receiver_address || order.receiverAddress || "-"}</Text>
             </div>
           </Col>
         </Row>
@@ -103,16 +114,26 @@ export default function OrderDetailsModal({
 
         <Row gutter={[16, 16]} justify="center">
           <Col>
-            <Tag bordered={false}>نوع الشحن: {order.shipType}</Tag>
+            <Tag bordered={false}>نوع الشحن: {getShipTypeText(order.ship_type || order.shipType)}</Tag>
           </Col>
           <Col>
-            <Tag bordered={false}>وزن الشحنة: {"-"}</Tag>
+            <Tag bordered={false}>
+              وزن الشحنة: {order.weight ? `${order.weight} كجم` : "-"}
+            </Tag>
           </Col>
           <Col>
-            <Tag bordered={false}>تاريخ الشحن: {order.createdAt}</Tag>
+            <Tag bordered={false}>
+              تاريخ الشحن: {order.created_at || order.createdAt 
+                ? dayjs(order.created_at || order.createdAt).format("DD-MM-YYYY")
+                : "-"}
+            </Tag>
           </Col>
           <Col>
-            <Tag bordered={false}>تاريخ التوصيل: {order.deliveryAt}</Tag>
+            <Tag bordered={false}>
+              تاريخ التوصيل: {order.delivery_at || order.deliveryAt
+                ? dayjs(order.delivery_at || order.deliveryAt).format("DD-MM-YYYY")
+                : "-"}
+            </Tag>
           </Col>
           <Col>
             <Tag color="blue" bordered={false}>

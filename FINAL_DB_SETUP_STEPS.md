@@ -33,15 +33,16 @@ Since you have nothing to lose, let's set up a clean database from scratch.
 
 **Expected Result:**
 - ✅ Success message: "Success. No rows returned"
-- ✅ All 8 tables created
+- ✅ All 9 tables created
 - ✅ All indexes created
 - ✅ Enum type created
 
 ### Step 4: Verify Tables
 1. Go to **"Table Editor"** in left sidebar
-2. You should see exactly **8 tables**:
+2. You should see exactly **9 tables**:
    - ✅ `profiles`
    - ✅ `providers`
+   - ✅ `employers` ← **NEW!**
    - ✅ `provider_drivers`
    - ✅ `orders`
    - ✅ `transactions`
@@ -49,20 +50,34 @@ Since you have nothing to lose, let's set up a clean database from scratch.
    - ✅ `permits`
    - ✅ `notifications`
 
-### Step 5: Verify profiles Table Structure
+### Step 5: Verify Table Structures
+
+**Check `profiles` table:**
 1. Click on `profiles` table
 2. Check columns - should see:
    - ✅ `id` (UUID, Primary Key)
    - ✅ `role` (enum)
    - ✅ `full_name` (text)
-   - ✅ `phone` (text)
-   - ✅ `email` (text)
+   - ✅ `phone` (text, NOT NULL)
+   - ✅ `email` (text, NOT NULL)
    - ✅ `id_number` (text)
    - ✅ `date_of_birth` (date)
    - ✅ `nationality` (text)
    - ✅ `address` (text)
-   - ✅ **`commercial_registration`** (text) ← Important!
-   - ✅ **`tax_number`** (text) ← Important!
+   - ✅ `created_at` (timestamp)
+   - ✅ `updated_at` (timestamp)
+   - ❌ Should NOT have `commercial_registration` or `tax_number` (moved to `employers` table)
+
+**Check `employers` table:**
+1. Click on `employers` table
+2. Check columns - should see:
+   - ✅ `id` (UUID, Primary Key, FK to profiles.id)
+   - ✅ `company_name` (text, NOT NULL)
+   - ✅ `commercial_registration` (text)
+   - ✅ `tax_number` (text)
+   - ✅ `activity_type` (text)
+   - ✅ `rating` (decimal, default 0.00)
+   - ✅ `address` (text)
    - ✅ `created_at` (timestamp)
    - ✅ `updated_at` (timestamp)
 
@@ -73,9 +88,9 @@ Since you have nothing to lose, let's set up a clean database from scratch.
 After running both scripts:
 - [ ] Cleanup.sql run successfully
 - [ ] Schema.sql run successfully
-- [ ] Exactly 8 tables visible in Table Editor
-- [ ] `profiles` table has `commercial_registration` column
-- [ ] `profiles` table has `tax_number` column
+- [ ] Exactly 9 tables visible in Table Editor
+- [ ] `employers` table exists with correct columns
+- [ ] `profiles` table does NOT have `commercial_registration` or `tax_number` (moved to `employers`)
 - [ ] No errors in SQL Editor
 
 ---
@@ -116,7 +131,7 @@ After running both scripts:
 
 **Result:**
 - ✅ Clean database
-- ✅ 8 tables matching new schema
+- ✅ 9 tables matching new schema (including `employers` table)
 - ✅ Ready for Employer role testing
 
 ---

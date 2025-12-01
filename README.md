@@ -1,324 +1,230 @@
-# Wazn Platform - Logistics Management System
+# Wazn Platform
 
-منصة وزن للخدمات اللوجستية - نظام إدارة الشحن والتوصيل
+A comprehensive logistics and shipping management platform built with React, TypeScript, and Supabase.
 
----
+## Overview
 
-## 📋 Overview
+Wazn is a multi-role logistics platform that connects clients, employers, providers, and drivers to facilitate efficient shipping and delivery services across Saudi Arabia.
 
-Wazn is a comprehensive logistics platform that connects clients, employers, service providers, and drivers to manage shipments efficiently. The platform supports multiple user roles with distinct features and workflows.
+## Features
 
----
+### Core Functionality
+- **Multi-role Authentication** - Support for Admin, Employer, Provider, Driver, and Client roles
+- **Order Management** - Create, track, and manage shipping orders
+- **Real-time Tracking** - Track shipments with status updates
+- **Payment Integration** - Invoice management, wallet balances, and payout requests
+- **Address Management** - Interactive map-based address selection using Leaflet
+- **Profile Management** - Comprehensive user profile management for all roles
 
-## 🚀 Quick Start
+### Role-Specific Features
 
-### Prerequisites
-- Node.js 18+ and npm
-- Supabase account (free tier works)
+#### Employer
+- Create and manage shipping orders
+- View order history and details
+- Manage company profile and billing
+- Track shipments
 
-### Installation
+#### Provider
+- Receive and manage orders
+- Assign orders to drivers
+- Manage driver team
+- View permits and licenses
+- Handle billing and payouts
 
-1. **Clone and install dependencies:**
-   ```bash
-   npm install
-   ```
+#### Driver
+- View assigned orders
+- Submit proof of delivery
+- Track earnings and wallet balance
+- Request payouts
 
-2. **Set up environment variables:**
-   Create a `.env` file in the root directory:
-   ```env
-   VITE_SUPABASE_URL=your-supabase-project-url
-   VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-   ```
+#### Client
+- Create shipping orders
+- Select providers
+- Track shipments
+- Manage addresses
+- View wallet balance
 
-3. **Set up database:**
-   - Go to Supabase Dashboard → SQL Editor
-   - Copy and run the SQL from `database/schema.sql`
+#### Admin
+- System-wide dashboard
+- Manage all users and companies
+- View all orders and transactions
+- System notifications
 
-4. **Start development server:**
-   ```bash
-   npm run dev
-   ```
+## Tech Stack
 
----
+- **Frontend**: React 19, TypeScript, Vite
+- **UI Library**: Ant Design 5
+- **Styling**: Tailwind CSS 4
+- **Maps**: Leaflet, React Leaflet
+- **Backend**: Supabase (PostgreSQL, Authentication, Storage)
+- **State Management**: React Context API, TanStack Query
+- **Form Handling**: React Hook Form, Zod validation
+- **Routing**: React Router DOM 7
 
-## 👥 User Roles
-
-The platform supports 6 user roles:
-
-| Role | Arabic Name | Description |
-|------|------------|-------------|
-| **Admin** | مسؤول النظام | System administrator with full oversight |
-| **Provider** | مزود خدمة | Service provider company (e.g., Aramex, Redbox) |
-| **Client** | عميل | Individual customer for personal shipments |
-| **Employer** | صاحب عمل | Business owner for company shipments |
-| **Driver** | سائق مستقل | Independent driver (works autonomously) |
-| **Guest** | زائر | Unauthenticated visitor |
-
-**See `ROLES_AND_RELATIONSHIPS.md` for detailed role information.**
-
----
-
-## ✅ Current Status
-
-### Fully Working Features
-
-#### Authentication ✅
-- Registration for all 4 roles (Client, Provider, Employer, Driver)
-- Login with phone/email
-- Logout
-- Session management
-- Password update (Employer)
-
-#### Profile Management ✅
-- All roles can load and update their profiles
-- Profile data persists in Supabase
-- Edit/Save/Cancel functionality
-
-#### Order Management ✅
-- **Employer**: Create orders directly, View orders list
-- **Client**: Complete shipment flow (create → select provider → pay → order created), Track orders
-- **Provider**: View orders (New/Current tabs), Edit orders
-- **Driver**: View orders, Submit proof of delivery
-
-#### Provider Features ✅
-- Drivers Management (Full CRUD)
-- Orders management with edit functionality
-- View order details
-- Permits management (view, download)
-- Billing (view details, download reports)
-- Notifications (view details)
-
-#### Driver Features ✅
-- Proof of delivery submission
-- Updates order status automatically
-- Billing (view transactions, download reports)
-
-#### Employer Features ✅
-- Profile management with password update
-- Order creation and management
-- Billing (view invoices, download invoices)
-
-### UI Ready (Using Mock Data)
-
-These pages work perfectly but use mock data:
-- Admin dashboard
-- Admin orders, companies, customers, payments, notifications
-- Some billing/invoice pages
-- Provider permits (view/download working)
-
-**Note:** These can be connected to Supabase when needed.
-
----
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 wazn_website/
 ├── src/
-│   ├── modules/
-│   │   ├── admin/          # Admin pages
-│   │   ├── client/         # Client pages
-│   │   ├── provider/       # Provider pages
-│   │   ├── driver/         # Driver pages
-│   │   ├── employer/      # Employer pages
-│   │   ├── auth/           # Authentication
-│   │   ├── landing/        # Landing page
-│   │   └── core/           # Shared components
-│   ├── services/           # Supabase service files
-│   ├── lib/
-│   │   └── supabase.ts     # Supabase client
-│   └── contexts/
-│       └── authContext.tsx # Auth context
-├── database/
-│   ├── schema.sql          # Database schema
-│   ├── cleanup.sql         # Database cleanup script
-│   └── ERD.md              # Entity Relationship Diagram
-└── README.md               # This file
+│   ├── modules/          # Feature modules
+│   │   ├── admin/        # Admin pages
+│   │   ├── employer/     # Employer pages
+│   │   ├── provider/     # Provider pages
+│   │   ├── driver/       # Driver pages
+│   │   ├── client/       # Client pages
+│   │   ├── auth/         # Authentication
+│   │   ├── landing/      # Landing page
+│   │   └── core/         # Shared components
+│   ├── services/         # API services
+│   ├── contexts/         # React contexts
+│   ├── lib/             # Library configurations
+│   └── config/           # App configuration
+├── database/             # Database schemas and migrations
+├── public/               # Static assets
+└── docs/                 # Documentation
 ```
 
----
+## Getting Started
 
-## 🗄️ Database
+### Prerequisites
 
-### Tables
+- Node.js 18+ and npm
+- Supabase account
+- Google Maps API key (optional, for address picker)
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd wazn_website
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Set up environment variables:
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and add your Supabase credentials:
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key  # Optional
+```
+
+4. Set up the database:
+   - Run SQL scripts in `database/` folder in order:
+     1. `schema.sql` - Base tables
+     2. `schema_enhanced.sql` - Payment tables
+     3. `rls_policies.sql` - Base RLS policies
+     4. `rls_policies_enhanced.sql` - Payment RLS policies
+     5. `fix_login_rls.sql` - Login RLS policy
+     6. `storage_setup.sql` - Storage buckets
+     7. `triggers.sql` - Auto-update triggers
+
+5. Start the development server:
+```bash
+npm run dev
+```
+
+6. Open [http://localhost:5173](http://localhost:5173)
+
+## Database Schema
+
+The platform uses PostgreSQL with the following main tables:
+
 - `profiles` - User profiles
+- `employers` - Employer-specific data
 - `providers` - Provider companies
-- `provider_drivers` - Provider-managed drivers
-- `orders` - All orders/shipments
-- `transactions` - Payments/earnings
+- `orders` - Shipping orders
+- `transactions` - Payment transactions
+- `invoices` - Employer invoices
+- `payout_requests` - Driver/provider payout requests
+- `wallet_balances` - User wallet balances
 - `proof_of_delivery` - Delivery proofs
-- `permits` - Provider licenses
-- `notifications` - User notifications
+- `permits` - Provider permits/licenses
+- `notifications` - System notifications
 
-**See `database/ERD.md` for detailed database structure.**
+See `database/ERD.md` for the complete entity relationship diagram.
 
-### Setup
-1. Run `database/schema.sql` in Supabase SQL Editor
-2. Tables will be created automatically
-3. RLS policies can be added later for production
+## Authentication
 
----
+The platform uses Supabase Authentication with:
+- Email/password authentication
+- Phone number lookup for login
+- Role-based access control (RBAC)
+- Row Level Security (RLS) policies
 
-## 🔧 Service Files
+## API Documentation
 
-All Supabase operations are organized in service files:
+### Services
 
-- `src/services/auth.ts` - Authentication (login, register, logout)
-- `src/services/profiles.ts` - Profile management
-- `src/services/orders.ts` - Order operations
-- `src/services/drivers.ts` - Provider drivers CRUD
-- `src/services/proof.ts` - Proof of delivery
+- `auth.ts` - Authentication (login, register, logout)
+- `orders.ts` - Order management (create, get, update)
+- `profiles.ts` - Profile management
+- `drivers.ts` - Driver management
+- `proof.ts` - Proof of delivery
 
----
+### Environment Variables
 
-## 🎨 Tech Stack
+- `VITE_SUPABASE_URL` - Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` - Supabase anonymous key
+- `VITE_GOOGLE_MAPS_API_KEY` - Google Maps API key (optional)
 
-- **Frontend:** React 18 + TypeScript
-- **UI Library:** Ant Design
-- **Styling:** Tailwind CSS
-- **Routing:** React Router DOM
-- **Forms:** React Hook Form + Zod
-- **Backend:** Supabase (PostgreSQL + Auth + Storage)
-- **State Management:** React Query
-- **Date Handling:** Day.js
-- **Build Tool:** Vite
+## Development
 
----
+### Available Scripts
 
-## 📝 Supabase Setup
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+- `npm run lint:fix` - Fix ESLint errors
+- `npm run format` - Format code with Prettier
 
-### Initial Setup
+### Code Style
 
-1. **Create Supabase Project**
-   - Go to [supabase.com](https://supabase.com)
-   - Create new project
-   - Choose region closest to your users
+- TypeScript strict mode enabled
+- ESLint for code quality
+- Prettier for code formatting
+- React Hooks best practices
 
-2. **Get Credentials**
-   - Settings → API
-   - Copy Project URL and anon key
-   - Add to `.env` file
+## Deployment
 
-3. **Create Database Tables**
-   - Run `database/schema.sql` in SQL Editor
-   - Verify tables in Table Editor
+### Build for Production
 
-4. **Configure Authentication**
-   - Authentication → Settings
-   - Disable email confirmation (for development)
-   - Enable Email provider
+```bash
+npm run build
+```
 
-### Email Confirmation
+The `dist` folder contains the production-ready files.
 
-By default, Supabase requires email confirmation. For development:
-- Go to Authentication → Settings
-- Disable "Enable email confirmations"
+### Environment Setup
 
-**See `SUPABASE_SETUP.md` for detailed setup guide.**
+Ensure all environment variables are set in your deployment platform:
+- Vercel: Add in Project Settings → Environment Variables
+- Netlify: Add in Site Settings → Environment Variables
+- Other platforms: Follow their environment variable documentation
 
----
+## Contributing
 
-## 🧪 Testing
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for contribution guidelines.
 
-### Test Registration
-1. Navigate to `/select-user`
-2. Choose a role
-3. Fill registration form
-4. Should see success and redirect
+## License
 
-### Test Login
-1. Go to `/login`
-2. Enter phone and password
-3. Should redirect to profile page
+[Add your license here]
 
-### Test Profile Update
-1. Go to any profile page
-2. Click "تعديل" (Edit)
-3. Make changes
-4. Click "حفظ" (Save)
-5. Changes should persist
+## Support
 
-### Test Order Creation
-- **Employer**: `/employer/create-order` → Fill form → Submit
-- **Client**: `/client/shipments` → Create shipment → Select provider → Pay
+For issues and questions, please open an issue on GitHub.
 
----
+## Acknowledgments
 
-## 🚧 Next Steps (Optional Enhancements)
-
-1. **Connect Remaining Pages**
-   - Replace mock data in order lists
-   - Connect billing pages
-   - Connect notifications
-
-2. **File Uploads**
-   - Set up Supabase Storage buckets
-   - Connect permit/license uploads
-   - Connect proof of delivery uploads
-
-3. **Advanced Features**
-   - Real-time order updates
-   - Email notifications
-   - Payment gateway integration
-   - Map integration for tracking
-
-4. **Security**
-   - Add Row Level Security (RLS) policies
-   - Set up proper access controls
-   - Add input validation
-
----
-
-## 📚 Documentation Files
-
-- **`ROLES_AND_RELATIONSHIPS.md`** - Detailed role information and relationships
-- **`database/ERD.md`** - Database Entity Relationship Diagram
-- **`SUPABASE_SETUP.md`** - Complete Supabase setup guide
-- **`database/schema.sql`** - Database schema (run in Supabase)
-
----
-
-## 🐛 Troubleshooting
-
-### "Missing Supabase environment variables"
-- Check `.env` file exists in root
-- Verify variable names: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
-- Restart dev server after creating `.env`
-
-### Can't login after registration
-- Check if email confirmation is enabled
-- Disable it in Supabase Dashboard → Authentication → Settings
-- Or check email for confirmation link
-
-### Database errors
-- Verify tables exist in Supabase Table Editor
-- Check SQL Editor for error messages
-- Ensure schema.sql was run successfully
-
----
-
-## 📄 License
-
-Private project - All rights reserved
-
----
-
-## 🎯 Summary
-
-**Status:** ✅ Core functionality working!
-
-- ✅ Authentication (Registration, Login, Logout, Password Update)
-- ✅ Profile Management (All roles)
-- ✅ Order Creation (Employer, Client)
-- ✅ Order Management (View, Edit, Track)
-- ✅ Provider Drivers Management (Full CRUD)
-- ✅ Proof of Delivery (Driver)
-- ✅ Navigation & Routing
-- ✅ Forms & Validation
-- ✅ Billing & Invoices (View, Download)
-- ✅ Notifications (View details)
-- ✅ Permits (View, Download)
-
-**Current Focus:** Employer role is production-ready and fully tested.
-
-The remaining items are enhancements that can be added incrementally.
+- Ant Design for the UI components
+- Supabase for the backend infrastructure
+- Leaflet for map functionality

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Form, Input, Button, Space, message, Tag, Modal } from "antd";
 import { CheckCircleOutlined } from "@ant-design/icons";
 import { useAuth } from "@/contexts/authContext";
-import { getProfile, updateProfile, getEmployerProfile } from "@/services/profiles";
+import { getProfile, getEmployerProfile } from "@/services/profiles";
 import { supabase } from "@/lib/supabase";
 import { updatePassword } from "@/services/auth";
 
@@ -14,6 +14,14 @@ export default function Profile() {
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordForm] = Form.useForm();
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [profileData, setProfileData] = useState<{
+    phone?: string;
+    email?: string;
+    companyName?: string;
+    documentNumber?: string;
+    commercialReg?: string;
+    taxNumber?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -25,34 +33,106 @@ export default function Profile() {
     if (!user) return;
     try {
       setLoading(true);
-      const [profile, employer] = await Promise.all([
-        getProfile(user.id),
-        getEmployerProfile(user.id),
-      ]);
+      // Get fresh session to ensure we have latest auth data
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Try direct query first to bypass potential service issues
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
 
-      if (profile) {
-        form.setFieldsValue({
-          companyName: employer?.company_name || profile.full_name || "",
-          commercialReg: employer?.commercial_registration || "",
-          taxNumber: employer?.tax_number || "",
-          documentNumber: profile.id_number || "",
-          phone: profile.phone || "",
-          email: profile.email || "",
-        });
-      } else {
-        // If no profile found, set empty values
-        form.setFieldsValue({
+      const { data: employerData } = await supabase
+        .from("employers")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+
+      // Use direct query results or fallback to service functions
+      const profile = profileData || await getProfile(user.id).catch(() => null);
+      const employer = employerData || await getEmployerProfile(user.id).catch(() => null);
+
+      // Get phone/email from multiple sources with priority:
+      // 1. profiles table (most reliable)
+      // 2. session user (from auth)
+      // 3. user object from context
+      // 4. user metadata
+      const phone = profile?.phone 
+        || session?.user?.phone 
+        || user.phone 
+        || user.user_metadata?.phone 
+        || "";
+      
+      const email = profile?.email 
+        || session?.user?.email 
+        || user.email 
+        || "";
+
+      // Build form values with proper fallbacks
+      const formValues = {
+        companyName: employer?.company_name || profile?.full_name || "",
+        commercialReg: employer?.commercial_registration || "",
+        taxNumber: employer?.tax_number || "",
+        documentNumber: profile?.id_number || "",
+        phone: phone,
+        email: email,
+      };
+      
+      // Store profile data in state for direct display
+      const dataToStore = {
+        phone: phone || undefined,
+        email: email || undefined,
+        companyName: formValues.companyName || undefined,
+        documentNumber: formValues.documentNumber || undefined,
+        commercialReg: formValues.commercialReg || undefined,
+        taxNumber: formValues.taxNumber || undefined,
+      };
+      setProfileData(dataToStore);
+      
+      // Set form values directly without resetting
+      // This ensures values are set even when form is disabled
+      form.setFieldsValue(formValues);
+      
+      // Force a re-render by updating form values again after a short delay
+      // This helps ensure Ant Design Form displays the values correctly
+      setTimeout(() => {
+        const currentValues = form.getFieldsValue();
+        
+        // If values are missing, set them again
+        const needsUpdate = {
+          phone: !currentValues.phone && formValues.phone,
+          email: !currentValues.email && formValues.email,
+        };
+        
+        if (needsUpdate.phone || needsUpdate.email) {
+          const updateValues: any = {};
+          if (needsUpdate.phone) updateValues.phone = formValues.phone;
+          if (needsUpdate.email) updateValues.email = formValues.email;
+          form.setFieldsValue(updateValues);
+        }
+      }, 300);
+      
+    } catch (error: any) {
+      console.error("Error loading profile:", error);
+      message.error("فشل تحميل البيانات");
+      
+      // Fallback: use auth user data
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const fallbackValues = {
           companyName: "",
           commercialReg: "",
           taxNumber: "",
           documentNumber: "",
-          phone: "",
-          email: "",
-        });
+          phone: session?.user?.phone || user?.phone || user?.user_metadata?.phone || "",
+          email: session?.user?.email || user?.email || "",
+        };
+        form.resetFields();
+        form.setFieldsValue(fallbackValues);
+      } catch (fallbackError) {
+        console.error("Fallback error:", fallbackError);
       }
-    } catch (error) {
-      console.error("Error loading profile:", error);
-      message.error("فشل تحميل البيانات");
     } finally {
       setLoading(false);
     }
@@ -132,8 +212,8 @@ export default function Profile() {
       setIsPasswordModalOpen(false);
       passwordForm.resetFields();
     } catch (error: any) {
-      message.error(error?.message || "فشل تحديث كلمة المرور");
       console.error("Error updating password:", error);
+      message.error(error?.message || "فشل تحديث كلمة المرور");
     } finally {
       setPasswordLoading(false);
     }
@@ -149,6 +229,7 @@ export default function Profile() {
         form={form}
         layout="vertical"
         disabled={!isEditing || loading}
+        preserve={false}
       >
         <Form.Item
           name="companyName"
@@ -186,7 +267,7 @@ export default function Profile() {
             <Input
               size="large"
               className="rounded-lg flex-1"
-              placeholder="05xxxxxxxx"
+              placeholder={profileData?.phone || "05xxxxxxxx"}
               inputMode="tel"
             />
             <Tag
@@ -211,7 +292,7 @@ export default function Profile() {
             <Input
               size="large"
               className="rounded-lg flex-1"
-              placeholder="example@gmail.com"
+              placeholder={profileData?.email || "example@gmail.com"}
               type="email"
             />
             <Tag
@@ -286,7 +367,7 @@ export default function Profile() {
       )}
 
       {isEditing && (
-        <div className="mt-4">
+        <div className="mt-4 flex gap-2">
           <Button 
             type="primary" 
             size="large" 
@@ -296,6 +377,14 @@ export default function Profile() {
             style={{ backgroundColor: "#6E69D1", borderColor: "#6E69D1" }}
           >
             حفظ المعلومات
+          </Button>
+          <Button 
+            size="large" 
+            onClick={handleCancel}
+            className="rounded-lg"
+            disabled={loading}
+          >
+            إلغاء
           </Button>
         </div>
       )}

@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { createOrder } from "@/services/orders";
 import { useAuth } from "@/contexts/authContext";
 import { useState } from "react";
+import AddressPicker from "@/modules/core/components/AddressPicker";
 
 const { Option } = Select;
 
@@ -21,24 +22,32 @@ export default function CreateOrder() {
     try {
       const values = await form.validateFields();
       setLoading(true);
+      
+      // Convert dayjs date to ISO string
+      const deliveryDate = values.shipmentDate 
+        ? dayjs(values.shipmentDate).toISOString()
+        : undefined;
+      
       await createOrder({
         employer_id: user.id,
-        ship_type: values.shipmentType || values.shipType,
+        ship_type: values.shipmentType,
         sender_name: values.senderName,
         sender_phone: values.senderPhone,
         sender_address: values.senderAddress,
         receiver_name: values.receiverName,
         receiver_phone: values.receiverPhone,
         receiver_address: values.receiverAddress,
-        weight: values.weight,
+        weight: values.weight ? Number(values.weight) : undefined,
         delivery_method: values.deliveryMethod,
-        delivery_at: values.deliveryDate?.toISOString() || values.shipmentDate?.toISOString(),
+        delivery_at: deliveryDate,
       });
+      
       message.success("تم إنشاء الطلب بنجاح!");
+      form.resetFields();
       navigate("/employer/orders");
     } catch (error: any) {
-      message.error(error?.message || "فشل إنشاء الطلب");
       console.error("Error creating order:", error);
+      message.error(error?.message || "فشل إنشاء الطلب");
     } finally {
       setLoading(false);
     }
@@ -82,13 +91,45 @@ export default function CreateOrder() {
             <Form.Item
               name="weight"
               label="وزن الشحنة"
-              rules={[{ required: true, message: "يرجى إدخال وزن الشحنة" }]}
+              rules={[
+                {
+                  validator: (_, value) => {
+                    if (!value || value === "" || value === null || value === undefined) {
+                      return Promise.reject(new Error("يرجى إدخال وزن الشحنة"));
+                    }
+                    const numValue = Number(value);
+                    if (isNaN(numValue)) {
+                      return Promise.reject(new Error("يرجى إدخال رقم صحيح"));
+                    }
+                    if (numValue < 1) {
+                      return Promise.reject(new Error("يجب أن يكون الوزن على الأقل 1 كجم"));
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
             >
               <Input
                 size="large"
                 className="rounded-lg"
-                placeholder="وزن الشحنة (كجم)"
+                placeholder="وزن الشحنة"
                 type="number"
+                min={1}
+                step={0.1}
+                addonAfter="كجم"
+                onKeyDown={(e) => {
+                  // Prevent negative numbers and scientific notation
+                  if (e.key === "-" || e.key === "e" || e.key === "E" || e.key === "+") {
+                    e.preventDefault();
+                  }
+                }}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Only allow numbers and one decimal point
+                  if (value && !/^\d*\.?\d*$/.test(value)) {
+                    e.target.value = value.replace(/[^\d.]/g, '');
+                  }
+                }}
               />
             </Form.Item>
 
@@ -127,10 +168,12 @@ export default function CreateOrder() {
               <Form.Item
                 name="senderAddress"
                 label="عنوان الإرسال"
-                rules={[{ required: true, message: "يرجى إدخال عنوان الإرسال" }]}
+                rules={[{ required: true, message: "يرجى تحديد عنوان الإرسال على الخريطة" }]}
                 className="md:col-span-2"
               >
-                <Input size="large" className="rounded-lg" placeholder="عنوان الإرسال" />
+                <AddressPicker
+                  placeholder="ابحث عن عنوان الإرسال أو انقر على الخريطة"
+                />
               </Form.Item>
             </div>
           </div>
@@ -157,10 +200,12 @@ export default function CreateOrder() {
               <Form.Item
                 name="receiverAddress"
                 label="عنوان الاستلام"
-                rules={[{ required: true, message: "يرجى إدخال عنوان الاستلام" }]}
+                rules={[{ required: true, message: "يرجى تحديد عنوان الاستلام على الخريطة" }]}
                 className="md:col-span-2"
               >
-                <Input size="large" className="rounded-lg" placeholder="عنوان الاستلام" />
+                <AddressPicker
+                  placeholder="ابحث عن عنوان الاستلام أو انقر على الخريطة"
+                />
               </Form.Item>
             </div>
           </div>
@@ -172,6 +217,7 @@ export default function CreateOrder() {
                 size="large"
                 htmlType="submit"
                 className="rounded-lg"
+                loading={loading}
                 style={{ backgroundColor: "#6E69D1", borderColor: "#6E69D1" }}
               >
                 إنشاء الطلب

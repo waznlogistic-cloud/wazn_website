@@ -6,6 +6,7 @@ import OrderDetailsModal from "@/modules/core/components/OrderDetailsModal";
 import { useState, useEffect } from "react";
 import { getOrders } from "@/services/orders";
 import { useAuth } from "@/contexts/authContext";
+import { useLocation } from "react-router-dom";
 import dayjs from "dayjs";
 
 // Mock data - fallback if no real data
@@ -140,6 +141,7 @@ const statusText: Record<Order["status"], string> = {
 
 export default function Orders() {
   const { user, role } = useAuth();
+  const location = useLocation();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -150,7 +152,7 @@ export default function Orders() {
     if (user && role === "employer") {
       loadOrders();
     }
-  }, [user, role]);
+  }, [user, role, location.pathname]); // Reload when route changes
 
   const loadOrders = async () => {
     if (!user) return;
@@ -166,36 +168,41 @@ export default function Orders() {
         tracking_no: order.tracking_no || order.trackingNo,
         shipType: order.ship_type || order.shipType,
         ship_type: order.ship_type || order.shipType,
+        weight: order.weight || undefined,
         createdAt: order.created_at || order.createdAt,
         created_at: order.created_at || order.createdAt,
         deliveryAt: order.delivery_at || order.deliveryAt,
         delivery_at: order.delivery_at || order.deliveryAt,
+        deliveredAt: order.delivered_at || order.deliveredAt,
+        delivered_at: order.delivered_at || order.deliveredAt,
         company: order.company || "-",
         price: order.price || 0,
-        shipperName: order.sender_name || order.senderName,
-        shipperPhone: order.sender_phone || order.senderPhone,
-        senderAddress: order.sender_address || order.senderAddress,
-        receiverAddress: order.receiver_address || order.receiverAddress,
-        sender_name: order.sender_name || order.senderName,
-        sender_phone: order.sender_phone || order.senderPhone,
+        // Sender info
+        shipperName: order.sender_name || order.senderName || order.shipperName,
+        shipperPhone: order.sender_phone || order.senderPhone || order.shipperPhone,
+        sender_name: order.sender_name || order.senderName || order.shipperName,
+        sender_phone: order.sender_phone || order.senderPhone || order.shipperPhone,
         sender_address: order.sender_address || order.senderAddress,
+        senderAddress: order.sender_address || order.senderAddress,
+        // Receiver info
         receiver_name: order.receiver_name || order.receiverName,
         receiver_phone: order.receiver_phone || order.receiverPhone,
         receiver_address: order.receiver_address || order.receiverAddress,
-        status: order.status,
+        receiverAddress: order.receiver_address || order.receiverAddress,
+        receiverName: order.receiver_name || order.receiverName,
+        receiverPhone: order.receiver_phone || order.receiverPhone,
+        status: order.status || "new",
+        client_id: order.client_id,
+        provider_id: order.provider_id,
+        driver_id: order.driver_id,
+        employer_id: order.employer_id,
       }));
 
-      // Use mock data if no real orders found (for demonstration)
-      if (transformedOrders.length === 0) {
-        setOrders(mockOrders);
-      } else {
-        setOrders(transformedOrders);
-      }
+      setOrders(transformedOrders);
     } catch (err: any) {
       console.error("Error loading orders:", err);
       setError(err?.message || "فشل تحميل الطلبات");
-      // Fallback to mock data on error
-      setOrders(mockOrders);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -211,6 +218,16 @@ export default function Orders() {
     return dayjs(dateString).format("DD-MM-YYYY");
   };
 
+  const getShipTypeText = (shipType?: string) => {
+    const types: Record<string, string> = {
+      document: "مستندات",
+      package: "طرد",
+      fragile: "قابل للكسر",
+      heavy: "ثقيل",
+    };
+    return types[shipType || ""] || shipType || "-";
+  };
+
   const columns: ColumnsType<Order> = [
     {
       title: "رقم الطلب",
@@ -223,6 +240,7 @@ export default function Orders() {
       dataIndex: "shipType",
       key: "shipType",
       width: 120,
+      render: (shipType: string) => getShipTypeText(shipType),
     },
     {
       title: "تاريخ الشحن",

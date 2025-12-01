@@ -5,6 +5,7 @@ import App from "./App.tsx";
 import { AuthProvider } from "@/contexts/authContext";
 import dayjs from "dayjs";
 import "dayjs/locale/ar";
+import "leaflet/dist/leaflet.css";
 
 // Configure dayjs for Arabic locale
 dayjs.locale("ar");

@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button, Form, Input, message } from "antd";
 import Logo from "@/components/Logo";
 import loginIcon from "@/assets/login_icon.svg";
@@ -12,52 +12,113 @@ type FormValues = {
 };
 
 export default function Login() {
-  const navigate = useNavigate();
   const { setRole } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string>("");
 
   const onFinish = async (values: FormValues) => {
     try {
       setLoading(true);
+      setDebugInfo("جاري البحث عن الحساب...");
+      
       // Supabase auth uses email, so we'll use phone as email or find user by phone
       // First try to find user by phone in profiles table to get their email
       const { supabase } = await import("@/lib/supabase");
       
-      let loginEmail = values.phone;
-      let userRole = "client";
+      // Normalize phone number (remove spaces, dashes, handle different formats)
+      const normalizePhone = (phone: string) => {
+        // Remove all non-digit characters except +
+        let normalized = phone.replace(/[^\d+]/g, '');
+        // Remove +966 or 966 prefix
+        if (normalized.startsWith('+966')) {
+          normalized = normalized.replace('+966', '0');
+        }
+        // Remove 966 prefix
+        if (normalized.startsWith('966')) {
+          normalized = '0' + normalized.replace('966', '');
+        }
+        // Ensure starts with 0
+        if (!normalized.startsWith('0')) {
+          normalized = '0' + normalized;
+        }
+        return normalized;
+      };
       
-      // Try to find user by phone to get email
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("email, role")
-        .eq("phone", values.phone)
-        .maybeSingle();
+      const normalizedPhone = normalizePhone(values.phone);
+      setDebugInfo(`البحث عن رقم الهاتف: ${values.phone} → ${normalizedPhone}`);
       
-      if (profile && profile.email) {
-        loginEmail = profile.email;
-        userRole = profile.role || "client";
-      } else if (!profile && profileError) {
-        console.warn("Profile lookup error:", profileError);
+      // Try multiple phone formats
+      const phoneVariations = [
+        normalizedPhone,
+        values.phone.trim(),
+        values.phone.replace(/\s+/g, ''),
+        `+966${normalizedPhone.substring(1)}`,
+        `966${normalizedPhone.substring(1)}`,
+      ];
+      
+      setDebugInfo(`محاولة البحث بالصيغ: ${phoneVariations.join(', ')}`);
+      
+      let profile = null;
+      let profileError = null;
+      
+      // Try each phone format
+      for (const phoneFormat of phoneVariations) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("email, role, phone")
+          .eq("phone", phoneFormat)
+          .maybeSingle();
+        
+        if (data && !error) {
+          profile = data;
+          setDebugInfo(`تم العثور على الحساب باستخدام الصيغة: ${phoneFormat}`);
+          break;
+        }
+        if (error) {
+          profileError = error;
+        }
       }
       
+      if (!profile || !profile.email) {
+        if (profileError) {
+          setDebugInfo(`خطأ في البحث: ${profileError.message}`);
+          console.error("Profile lookup error:", profileError);
+        } else {
+          setDebugInfo("لم يتم العثور على حساب بهذا الرقم");
+        }
+        setLoading(false);
+        message.error("لم يتم العثور على حساب بهذا الرقم. يرجى التحقق من رقم الهاتف أو إنشاء حساب جديد.");
+        return;
+      }
+      
+      const loginEmail = profile.email;
+      const userRole = profile.role || "client";
+      setDebugInfo(`تم العثور على الحساب! البريد: ${loginEmail}, الدور: ${userRole}`);
+      
       // Try login with email
+      setDebugInfo("جاري تسجيل الدخول...");
       const loginResult = await login({
         email: loginEmail,
         password: values.password,
       });
       
       if (!loginResult.session) {
+        setDebugInfo("فشل تسجيل الدخول: لا توجد جلسة");
+        setLoading(false);
         message.warning("يرجى التحقق من رقم الهاتف لتأكيد الحساب أولاً");
         return;
       }
       
-      message.success("تم تسجيل الدخول بنجاح!");
-      
       // Get user role from session
       const finalRole = loginResult.user?.user_metadata?.role || userRole || "client";
+      setDebugInfo(`تم تسجيل الدخول بنجاح! الدور: ${finalRole}`);
+      
+      // Update role in context
       setRole(finalRole as any);
       
-      // Navigate based on role
+      message.success("تم تسجيل الدخول بنجاح!");
+      
+      // Determine target route
       const roleRoutes: Record<string, string> = {
         client: "/client/profile",
         provider: "/provider/profile",
@@ -65,24 +126,45 @@ export default function Login() {
         employer: "/employer/profile",
         admin: "/admin/home",
       };
-      navigate(roleRoutes[finalRole] || "/client/profile");
+      
+      const targetRoute = roleRoutes[finalRole] || "/client/profile";
+      setDebugInfo(`جاري التوجيه إلى: ${targetRoute}`);
+      
+      // Reset loading before navigation
+      setLoading(false);
+      
+      // Navigate immediately - auth context will update via onAuthStateChange
+      setTimeout(() => {
+        setDebugInfo(`التوجيه الآن إلى: ${targetRoute}`);
+        window.location.href = targetRoute;
+      }, 500);
     } catch (error: any) {
-      console.error("Login error:", error);
+      const errorDetails = {
+        message: error?.message,
+        status: error?.status,
+        name: error?.name,
+      };
+      
+      setDebugInfo(`خطأ: ${JSON.stringify(errorDetails, null, 2)}`);
+      setLoading(false);
+      
       let errorMessage = "فشل تسجيل الدخول. تحقق من البيانات المدخلة.";
       
       if (error?.message) {
-        if (error.message.includes("Invalid login credentials")) {
-          errorMessage = "البريد الإلكتروني أو كلمة المرور غير صحيحة";
-        } else         if (error.message.includes("Email not confirmed") || error.message.includes("Phone not confirmed")) {
+        const errorMsg = error.message.toLowerCase();
+        
+        if (errorMsg.includes("invalid login credentials") || errorMsg.includes("invalid password")) {
+          errorMessage = "البريد الإلكتروني أو كلمة المرور غير صحيحة. يرجى المحاولة مرة أخرى.";
+        } else if (errorMsg.includes("email not confirmed") || errorMsg.includes("phone not confirmed")) {
           errorMessage = "يرجى التحقق من رقم الهاتف لتأكيد الحساب";
+        } else if (errorMsg.includes("user not found")) {
+          errorMessage = "لم يتم العثور على حساب بهذا الرقم";
         } else {
-          errorMessage = error.message;
+          errorMessage = `خطأ في تسجيل الدخول: ${error.message}`;
         }
       }
       
       message.error(errorMessage);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -148,6 +230,14 @@ export default function Login() {
                     تسجيل الدخول
                   </Button>
                 </Form.Item>
+                
+                {debugInfo && (
+                  <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs text-gray-700 font-mono whitespace-pre-wrap">
+                    <strong>معلومات التصحيح:</strong>
+                    <br />
+                    {debugInfo}
+                  </div>
+                )}
               </Form>
             </div>
 
