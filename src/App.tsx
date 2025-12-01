@@ -59,7 +59,18 @@ export default function App() {
     <ConfigProvider direction="rtl" theme={antdTheme}>
       <BrowserRouter>
         <QueryProvider>
-          <Suspense fallback={<div />}>
+          <Suspense fallback={
+            <div style={{ 
+              minHeight: "100vh", 
+              display: "flex", 
+              alignItems: "center", 
+              justifyContent: "center",
+              fontFamily: "Tajawal, sans-serif",
+              fontSize: "18px"
+            }}>
+              جاري التحميل...
+            </div>
+          }>
             <Routes>
               {/* Public */}
               <Route path="/" element={<LandingPage />} />

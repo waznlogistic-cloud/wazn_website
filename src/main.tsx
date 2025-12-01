@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
 import { AuthProvider } from "@/contexts/authContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import dayjs from "dayjs";
 import "dayjs/locale/ar";
 import "leaflet/dist/leaflet.css";
@@ -10,10 +11,18 @@ import "leaflet/dist/leaflet.css";
 // Configure dayjs for Arabic locale
 dayjs.locale("ar");
 
-createRoot(document.getElementById("root")!).render(
+const rootElement = document.getElementById("root");
+
+if (!rootElement) {
+  throw new Error("Root element not found");
+}
+
+createRoot(rootElement).render(
   <StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </ErrorBoundary>
   </StrictMode>
 );
