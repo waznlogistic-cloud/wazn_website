@@ -69,11 +69,18 @@ export default function Login() {
             phone_number: phoneFormat
           });
           
-          // Log for debugging
-          console.log(`Trying phone format: ${phoneFormat}`, { data, error });
+          // Log for debugging (always log, even in production)
+          console.log(`[LOGIN DEBUG] Trying phone format: ${phoneFormat}`, { data, error });
+          setDebugInfo(`محاولة: ${phoneFormat}... ${error ? `خطأ: ${error.message}` : data ? 'تم!' : 'لا يوجد'}`);
           
           if (error) {
-            console.error(`RPC error for ${phoneFormat}:`, error);
+            console.error(`[LOGIN DEBUG] RPC error for ${phoneFormat}:`, error);
+            console.error(`[LOGIN DEBUG] Error details:`, {
+              message: error.message,
+              code: error.code,
+              details: error.details,
+              hint: error.hint
+            });
             profileError = error;
             // Continue to next format
             continue;
@@ -81,12 +88,19 @@ export default function Login() {
           
           if (data && Array.isArray(data) && data.length > 0) {
             profile = data[0];
-            setDebugInfo(`تم العثور على الحساب باستخدام الصيغة: ${phoneFormat}`);
-            console.log('Found profile:', profile);
+            setDebugInfo(`✅ تم العثور على الحساب باستخدام الصيغة: ${phoneFormat}`);
+            console.log('[LOGIN DEBUG] Found profile:', profile);
             break;
+          } else {
+            console.log(`[LOGIN DEBUG] No data returned for ${phoneFormat}`);
           }
         } catch (rpcError: any) {
-          console.error(`RPC call failed for ${phoneFormat}:`, rpcError);
+          console.error(`[LOGIN DEBUG] RPC call failed for ${phoneFormat}:`, rpcError);
+          console.error(`[LOGIN DEBUG] Exception details:`, {
+            message: rpcError?.message,
+            stack: rpcError?.stack,
+            name: rpcError?.name
+          });
           profileError = rpcError;
           continue;
         }
