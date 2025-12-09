@@ -1,14 +1,11 @@
 -- ============================================
--- Secure Login Function
--- Creates a function that only exposes email and role for login
--- This is more secure than allowing direct table access
+-- Fix: Function returning wrong user
+-- The WHERE clause wasn't properly referencing the parameter
+-- Run this to fix the function
 -- ============================================
 
--- Drop function if exists
 DROP FUNCTION IF EXISTS public.get_user_email_by_phone(TEXT);
 
--- Create secure function that only returns email and role
--- This function can only return email and role, not other sensitive data
 CREATE OR REPLACE FUNCTION public.get_user_email_by_phone(phone_number TEXT)
 RETURNS TABLE (
   email TEXT,
@@ -21,7 +18,7 @@ SET search_path = public
 AS $$
 BEGIN
   -- Only return email, role, and phone - no other sensitive data
-  -- Use explicit parameter reference to avoid ambiguity
+  -- Use explicit function-qualified parameter name to avoid ambiguity
   RETURN QUERY
   SELECT 
     p.email,
@@ -33,10 +30,14 @@ BEGIN
 END;
 $$;
 
--- Grant execute permission to anonymous users
+-- Grant execute permission
 GRANT EXECUTE ON FUNCTION public.get_user_email_by_phone(TEXT) TO anon;
 GRANT EXECUTE ON FUNCTION public.get_user_email_by_phone(TEXT) TO authenticated;
 
--- Add comment for documentation
-COMMENT ON FUNCTION public.get_user_email_by_phone IS 'Secure function for login that only returns email, role, and phone. Does not expose other sensitive profile data.';
+-- Test the fix
+SELECT * FROM get_user_email_by_phone('0512345678');
+-- Should return: email: test2@gmail.com, role: employer, phone: 0512345678
+
+SELECT * FROM get_user_email_by_phone('0587654321');
+-- Should return: email: test@example.com, role: employer, phone: 0587654321
 

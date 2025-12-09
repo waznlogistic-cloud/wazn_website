@@ -63,26 +63,32 @@ export default function Login() {
       
       // Try each phone format using secure function
       for (const phoneFormat of phoneVariations) {
-        // Use secure function instead of direct table access
-        const { data, error } = await supabase.rpc('get_user_email_by_phone', {
-          phone_number: phoneFormat
-        });
-        
-        // Log for debugging
-        console.log(`Trying phone format: ${phoneFormat}`, { data, error });
-        
-        if (error) {
-          console.error(`RPC error for ${phoneFormat}:`, error);
-          profileError = error;
-          // Continue to next format
+        try {
+          // Use secure function instead of direct table access
+          const { data, error } = await supabase.rpc('get_user_email_by_phone', {
+            phone_number: phoneFormat
+          });
+          
+          // Log for debugging
+          console.log(`Trying phone format: ${phoneFormat}`, { data, error });
+          
+          if (error) {
+            console.error(`RPC error for ${phoneFormat}:`, error);
+            profileError = error;
+            // Continue to next format
+            continue;
+          }
+          
+          if (data && Array.isArray(data) && data.length > 0) {
+            profile = data[0];
+            setDebugInfo(`تم العثور على الحساب باستخدام الصيغة: ${phoneFormat}`);
+            console.log('Found profile:', profile);
+            break;
+          }
+        } catch (rpcError: any) {
+          console.error(`RPC call failed for ${phoneFormat}:`, rpcError);
+          profileError = rpcError;
           continue;
-        }
-        
-        if (data && Array.isArray(data) && data.length > 0) {
-          profile = data[0];
-          setDebugInfo(`تم العثور على الحساب باستخدام الصيغة: ${phoneFormat}`);
-          console.log('Found profile:', profile);
-          break;
         }
       }
       

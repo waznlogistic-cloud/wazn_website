@@ -22,13 +22,14 @@ SET search_path = public
 AS $$
 BEGIN
   -- Only return email, role, and phone - no other sensitive data
+  -- Use explicit parameter reference to avoid ambiguity
   RETURN QUERY
   SELECT 
     p.email,
     p.role::TEXT,
     p.phone
   FROM public.profiles p
-  WHERE p.phone = phone_number
+  WHERE p.phone = get_user_email_by_phone.phone_number
   LIMIT 1;
 END;
 $$;
