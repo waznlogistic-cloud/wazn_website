@@ -126,7 +126,7 @@ export default function LandingPage() {
               "التحليلات اللوجستية",
               "التخزين",
               "نقل البضائع",
-              "التعامل الآمن",
+              "خدمة الذكاء الاصطناعي",
               "التوصيل السريع",
               "الشحن العالمي",
             ].map((title, i) => (
@@ -179,7 +179,7 @@ export default function LandingPage() {
           </div>
           <div>
             <h4 className="font-semibold mb-2">تواصل معنا</h4>
-            <p className="text-white/80 text-sm">الهاتف الوطني الموحد: 7050286465</p>
+            <p className="text-white/80 text-sm">الرقم الموحد: 7050286465</p>
             <p className="text-white/80 text-sm">مركز الأعمال السعودي</p>
           </div>
           <div className="self-end text-sm text-white/70">© {new Date().getFullYear()} Wazn</div>
