@@ -68,13 +68,21 @@ export default function Login() {
           phone_number: phoneFormat
         });
         
-        if (data && data.length > 0 && !error) {
+        // Log for debugging
+        console.log(`Trying phone format: ${phoneFormat}`, { data, error });
+        
+        if (error) {
+          console.error(`RPC error for ${phoneFormat}:`, error);
+          profileError = error;
+          // Continue to next format
+          continue;
+        }
+        
+        if (data && Array.isArray(data) && data.length > 0) {
           profile = data[0];
           setDebugInfo(`تم العثور على الحساب باستخدام الصيغة: ${phoneFormat}`);
+          console.log('Found profile:', profile);
           break;
-        }
-        if (error) {
-          profileError = error;
         }
       }
       
