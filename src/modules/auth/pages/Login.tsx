@@ -66,7 +66,7 @@ export default function Login() {
         try {
           // Use secure function instead of direct table access
           const { data, error } = await supabase.rpc('get_user_email_by_phone', {
-            phone: phoneFormat
+            phone_number: phoneFormat
           });
           
           // Log for debugging

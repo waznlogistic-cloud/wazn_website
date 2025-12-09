@@ -6,7 +6,7 @@
 
 DROP FUNCTION IF EXISTS public.get_user_email_by_phone(TEXT);
 
-CREATE OR REPLACE FUNCTION public.get_user_email_by_phone(phone_number TEXT)
+CREATE OR REPLACE FUNCTION public.get_user_email_by_phone(phone TEXT)
 RETURNS TABLE (
   email TEXT,
   role TEXT,
@@ -25,7 +25,7 @@ BEGIN
     p.role::TEXT,
     p.phone
   FROM public.profiles p
-  WHERE p.phone = get_user_email_by_phone.phone_number
+  WHERE p.phone = get_user_email_by_phone.phone
   LIMIT 1;
 END;
 $$;
