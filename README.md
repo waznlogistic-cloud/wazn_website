@@ -228,3 +228,4 @@ For issues and questions, please open an issue on GitHub.
 - Ant Design for the UI components
 - Supabase for the backend infrastructure
 - Leaflet for map functionality
+
