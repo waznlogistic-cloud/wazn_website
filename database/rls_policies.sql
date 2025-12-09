@@ -21,11 +21,13 @@ ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 -- Step 2: PROFILES POLICIES
 -- ============================================
 
--- Allow unauthenticated users to read email and role by phone (for login)
-CREATE POLICY "Public can read email and role by phone for login"
-ON public.profiles FOR SELECT
-TO anon
-USING (true);
+-- SECURITY NOTE: We do NOT create a direct SELECT policy for anonymous users
+-- Instead, we use a SECURITY DEFINER function (get_user_email_by_phone) 
+-- that only exposes email, role, and phone columns.
+-- This prevents exposure of sensitive data like full_name, id_number, address, etc.
+-- 
+-- The function is created in secure_login_function.sql
+-- This is more secure than allowing direct table access with USING (true)
 
 -- Users can read their own profile
 CREATE POLICY "Users can read own profile"

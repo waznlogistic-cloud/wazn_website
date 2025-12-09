@@ -61,16 +61,15 @@ export default function Login() {
       let profile = null;
       let profileError = null;
       
-      // Try each phone format
+      // Try each phone format using secure function
       for (const phoneFormat of phoneVariations) {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("email, role, phone")
-          .eq("phone", phoneFormat)
-          .maybeSingle();
+        // Use secure function instead of direct table access
+        const { data, error } = await supabase.rpc('get_user_email_by_phone', {
+          phone_number: phoneFormat
+        });
         
-        if (data && !error) {
-          profile = data;
+        if (data && data.length > 0 && !error) {
+          profile = data[0];
           setDebugInfo(`تم العثور على الحساب باستخدام الصيغة: ${phoneFormat}`);
           break;
         }
