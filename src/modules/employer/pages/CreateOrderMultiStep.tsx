@@ -71,6 +71,24 @@ export default function CreateOrderMultiStep() {
       setCalculatingRates(true);
       const shippingOptionsList: ShippingProvider[] = [];
       
+      // Helper functions to calculate default prices (defined outside try-catch for accessibility)
+      const getDefaultAramexPrice = (weight: number): number => {
+        // Default pricing: base 35 SAR + weight-based charge
+        const basePrice = 35;
+        const weightCharge = Math.max(weight - 1, 0) * 5; // 5 SAR per kg above 1kg
+        const total = basePrice + weightCharge;
+        // Apply 7% profit margin
+        return Math.round(total * 1.07 * 100) / 100;
+      };
+
+      const getDefaultMrsoolPrice = (): number => {
+        // Default pricing: base 27.5 SAR + estimated distance charge (assume 20km = 4 SAR) + 6 SAR margin
+        const basePrice = 27.5;
+        const estimatedDistanceCharge = 4; // Assume ~20km
+        const margin = 6;
+        return basePrice + estimatedDistanceCharge + margin;
+      };
+      
       try {
           // Dynamically import services and utilities
           const [
@@ -88,25 +106,6 @@ export default function CreateOrderMultiStep() {
           ]);
           
           const config = getIntegrationsConfig();
-
-          // Helper function to calculate default Aramex price
-          const getDefaultAramexPrice = (weight: number): number => {
-            // Default pricing: base 35 SAR + weight-based charge
-            const basePrice = 35;
-            const weightCharge = Math.max(weight - 1, 0) * 5; // 5 SAR per kg above 1kg
-            const total = basePrice + weightCharge;
-            // Apply 7% profit margin
-            return Math.round(total * 1.07 * 100) / 100;
-          };
-
-          // Helper function to calculate default Mrsool price
-          const getDefaultMrsoolPrice = (): number => {
-            // Default pricing: base 27.5 SAR + estimated distance charge (assume 20km = 4 SAR) + 6 SAR margin
-            const basePrice = 27.5;
-            const estimatedDistanceCharge = 4; // Assume ~20km
-            const margin = 6;
-            return basePrice + estimatedDistanceCharge + margin;
-          };
 
           // Calculate Aramex rates if enabled (wrap in try-catch so it doesn't block Mrsool)
           if (config.aramex.enabled) {
@@ -403,30 +402,52 @@ export default function CreateOrderMultiStep() {
             mrsoolLocationsAvailable: !!(senderLocation && receiverLocation),
           });
           
-          // Set all shipping options (always show options, even if using default prices)
-          if (shippingOptionsList.length > 0) {
-            setShippingOptions(shippingOptionsList);
+          // Always show default shipping options for testing, even if integrations aren't configured
+          // This ensures the app works on deployed versions without requiring environment setup
+          if (shippingOptionsList.length === 0) {
+            console.log("⚠️ No shipping options calculated, using default options for testing");
             
-            // Show info message if any prices are estimated
-            const estimatedCount = shippingOptionsList.filter(opt => opt.isEstimated).length;
-            if (estimatedCount > 0) {
-              message.info({
-                content: `تم استخدام أسعار تقديرية لـ ${estimatedCount} من شركات الشحن بسبب عدم توفر الاتصال بالخادم. سيتم تحديث الأسعار عند توفر الاتصال.`,
-                duration: 8,
-              });
-            }
-          } else {
-            // Only throw error if no providers are enabled at all
-            if (!config.aramex.enabled && !config.mrsool.enabled) {
-              throw new Error(
-                "لا توجد شركات شحن مفعلة في الإعدادات. يرجى تفعيل Aramex أو Mrsool في ملف .env.local"
-              );
-            } else {
-              // This shouldn't happen now since we use default prices, but keep as fallback
-              throw new Error(
-                "حدث خطأ غير متوقع في حساب أسعار الشحن. يرجى المحاولة مرة أخرى."
-              );
-            }
+            // Add default Aramex option
+            const defaultAramexPrice = getDefaultAramexPrice(orderData.weight ? Number(orderData.weight) : 1);
+            shippingOptionsList.push({
+              id: "aramex",
+              name: "ارامكس",
+              logo: aramexLogo,
+              rating: 5,
+              price: defaultAramexPrice,
+              shippingType: orderData.deliveryMethod === "express" ? "شحن سريع" : "شحن عادي",
+              isEstimated: true,
+            });
+            
+            // Add default Mrsool option
+            const defaultMrsoolPrice = getDefaultMrsoolPrice();
+            shippingOptionsList.push({
+              id: "mrsool",
+              name: "مرسول",
+              logo: mrsoolLogo,
+              rating: 5,
+              price: defaultMrsoolPrice,
+              shippingType: "توصيل سريع",
+              isEstimated: true,
+            });
+            
+            // Show info message that default prices are being used
+            message.info({
+              content: "يتم استخدام أسعار تقديرية للاختبار. سيتم تحديث الأسعار عند تفعيل التكاملات.",
+              duration: 6,
+            });
+          }
+          
+          // Set all shipping options
+          setShippingOptions(shippingOptionsList);
+          
+          // Show info message if any prices are estimated
+          const estimatedCount = shippingOptionsList.filter(opt => opt.isEstimated).length;
+          if (estimatedCount > 0 && estimatedCount < shippingOptionsList.length) {
+            message.info({
+              content: `تم استخدام أسعار تقديرية لـ ${estimatedCount} من شركات الشحن بسبب عدم توفر الاتصال بالخادم. سيتم تحديث الأسعار عند توفر الاتصال.`,
+              duration: 8,
+            });
           }
         } catch (error: any) {
           console.error("❌ Error calculating rates:", error);
@@ -442,18 +463,38 @@ export default function CreateOrderMultiStep() {
             },
           });
           
-          // Use the error message directly (it already contains detailed reasons)
-          const errorMessage = error.message || "تعذر الاتصال بخدمة حساب الأسعار";
-          
-          // Show error message
+          // Always ensure we have default options for testing, even if there was an error
           if (shippingOptionsList.length === 0) {
-            // No options available - show error
-            message.error({
-              content: errorMessage,
-              duration: 10, // Show for 10 seconds so user can read it
+            console.log("⚠️ Error occurred and no options available, adding default options for testing");
+            
+            // Add default options as fallback - always show options for testing
+            const defaultAramexPrice = getDefaultAramexPrice(orderData.weight ? Number(orderData.weight) : 1);
+            shippingOptionsList.push({
+              id: "aramex",
+              name: "ارامكس",
+              logo: aramexLogo,
+              rating: 5,
+              price: defaultAramexPrice,
+              shippingType: orderData.deliveryMethod === "express" ? "شحن سريع" : "شحن عادي",
+              isEstimated: true,
             });
-            // Set empty options so user can see the error state
-            setShippingOptions([]);
+            
+            const defaultMrsoolPrice = getDefaultMrsoolPrice();
+            shippingOptionsList.push({
+              id: "mrsool",
+              name: "مرسول",
+              logo: mrsoolLogo,
+              rating: 5,
+              price: defaultMrsoolPrice,
+              shippingType: "توصيل سريع",
+              isEstimated: true,
+            });
+            
+            setShippingOptions(shippingOptionsList);
+            message.info({
+              content: "يتم استخدام أسعار تقديرية للاختبار. يمكنك المتابعة مع هذه الأسعار.",
+              duration: 6,
+            });
           } else {
             // Some options available - show warning but continue
             message.warning({
