@@ -4,7 +4,6 @@ import "./index.css";
 import App from "./App.tsx";
 import { AuthProvider } from "@/contexts/authContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { initializeIntegrations } from "@/config/integrations";
 import dayjs from "dayjs";
 import "dayjs/locale/ar";
 import "leaflet/dist/leaflet.css";
@@ -12,8 +11,19 @@ import "leaflet/dist/leaflet.css";
 // Configure dayjs for Arabic locale
 dayjs.locale("ar");
 
-// Initialize third-party integrations
-initializeIntegrations();
+// Initialize third-party integrations (non-blocking, won't crash app if fails)
+// Defer initialization to avoid blocking app startup
+setTimeout(() => {
+  try {
+    import("@/config/integrations").then((module) => {
+      module.initializeIntegrations();
+    }).catch((error) => {
+      console.error("Failed to initialize integrations:", error);
+    });
+  } catch (error) {
+    console.error("Failed to load integrations module:", error);
+  }
+}, 100);
 
 const rootElement = document.getElementById("root");
 

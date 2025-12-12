@@ -34,4 +34,15 @@ export type Order = {
   provider_id?: string;
   driver_id?: string;
   employer_id?: string;
+  // Aramex integration fields
+  aramex_shipment_id?: string;
+  aramex_tracking_number?: string;
+  aramex_label_url?: string;
+  // Payment integration fields
+  payment_status?: string;
+  tap_charge_id?: string;
+  payment_amount?: number;
+  payment_currency?: string;
+  payment_method?: string;
+  paid_at?: string;
 };

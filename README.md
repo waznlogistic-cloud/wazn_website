@@ -107,15 +107,17 @@ npm install
 
 3. Set up environment variables:
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-Edit `.env` and add your Supabase credentials:
-```
+Edit `.env.local` and add your Supabase credentials:
+```env
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key  # Optional
 ```
+
+**Note:** `.env.local` is gitignored and is the recommended file for local development. Vite automatically loads `.env.local` with highest priority.
 
 4. Set up the database:
    - Run SQL scripts in `database/` folder in order:
@@ -126,6 +128,7 @@ VITE_GOOGLE_MAPS_API_KEY=your_google_maps_key  # Optional
      5. `fix_login_rls.sql` - Login RLS policy
      6. `storage_setup.sql` - Storage buckets
      7. `triggers.sql` - Auto-update triggers
+     8. `integrations_schema.sql` - Integration fields (Aramex, Tap Payments)
 
 5. Start the development server:
 ```bash
@@ -165,16 +168,33 @@ The platform uses Supabase Authentication with:
 ### Services
 
 - `auth.ts` - Authentication (login, register, logout)
-- `orders.ts` - Order management (create, get, update)
+- `orders.ts` - Order management (create, get, update) with Aramex integration
 - `profiles.ts` - Profile management
 - `drivers.ts` - Driver management
 - `proof.ts` - Proof of delivery
+- `aramex.ts` - Aramex shipping API integration
+- `tapPayments.ts` - Tap Payments integration (future)
 
 ### Environment Variables
 
+**Required:**
 - `VITE_SUPABASE_URL` - Supabase project URL
 - `VITE_SUPABASE_ANON_KEY` - Supabase anonymous key
-- `VITE_GOOGLE_MAPS_API_KEY` - Google Maps API key (optional)
+
+**Optional:**
+- `VITE_GOOGLE_MAPS_API_KEY` - Google Maps API key (not used, we use OpenStreetMap)
+
+**Aramex Integration:**
+- `VITE_ARAMEX_ENABLED` - Enable/disable Aramex integration (default: false)
+- `VITE_ARAMEX_ACCOUNT_NUMBER` - Aramex account number
+- `VITE_ARAMEX_USERNAME` - Aramex API username
+- `VITE_ARAMEX_PASSWORD` - Aramex API password
+- `VITE_ARAMEX_ACCOUNT_PIN` - Aramex account PIN
+- `VITE_ARAMEX_ACCOUNT_ENTITY` - Aramex account entity (e.g., "DHA", "AMM")
+- `VITE_ARAMEX_ACCOUNT_COUNTRY_CODE` - Country code (default: "SA")
+- `VITE_ARAMEX_API_URL` - Aramex API base URL (default: https://ws.aramex.net)
+
+See `.env.example` for complete configuration.
 
 ## Development
 

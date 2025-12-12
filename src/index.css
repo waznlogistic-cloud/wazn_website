@@ -25,3 +25,32 @@ body {
 .border-soft {
   border-color: var(--border);
 }
+
+/* Custom Steps Styling */
+.custom-steps .ant-steps-item-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.custom-steps .ant-steps-item-process .ant-steps-item-icon {
+  background-color: #6E69D1;
+  border-color: #6E69D1;
+}
+
+.custom-steps .ant-steps-item-finish .ant-steps-item-icon {
+  background-color: #6E69D1;
+  border-color: #6E69D1;
+}
+
+.custom-steps .ant-steps-item-finish .ant-steps-item-icon > .ant-steps-icon {
+  color: white;
+}
+
+.custom-steps .ant-steps-item-finish > .ant-steps-item-container > .ant-steps-item-content > .ant-steps-item-title {
+  color: #6E69D1;
+}
+
+.custom-steps .ant-steps-item-process > .ant-steps-item-container > .ant-steps-item-content > .ant-steps-item-title {
+  color: #6E69D1;
+  font-weight: 700;
+}

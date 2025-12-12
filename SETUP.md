@@ -12,11 +12,18 @@ npm install
 ```
 
 ### 2. Environment Variables
-Create `.env` file:
+Copy `.env.example` to `.env.local`:
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` and add your credentials:
 ```env
 VITE_SUPABASE_URL=your-supabase-url
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
+
+**Note:** `.env.local` is gitignored and is the recommended file for local development. Vite automatically loads `.env.local` with highest priority.
 
 ### 3. Database Setup
 Run SQL scripts in Supabase SQL Editor (in order):

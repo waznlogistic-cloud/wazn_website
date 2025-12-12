@@ -53,6 +53,7 @@ export interface AramexRateRequest {
       unit: "KG" | "LB";
     };
     descriptionOfGoods?: string;
+    goodsOriginCountry?: string; // Country code where goods originated
     customsValueAmount?: number;
     customsValueCurrency?: string;
   };
@@ -102,15 +103,16 @@ export interface AramexShipmentRequest {
     countryCode: string;
   };
   details: {
-    numberOfPieces: number;
+    numberOfPieces: number; // Mandatory (M)
     weight: number; // in kg
     weightUnit: "KG" | "LB";
     productGroup: "EXP" | "DOM"; // Express or Domestic
     productType: string; // e.g., "ONX", "CDX", "EPX"
-    paymentType: "P" | "3" | "C"; // P=Prepaid, 3=Third Party, C=Collect
+    paymentType: "P" | "3" | "C"; // Mandatory (M): P=Prepaid, 3=Third Party, C=Collect
     paymentOptions?: string;
     services?: string[];
-    description?: string;
+    description?: string; // DescriptionOfGoods - Mandatory (M)
+    goodsOriginCountry?: string; // Mandatory (M): Country code where goods originated
     customsValueAmount?: number;
     customsValueCurrency?: string;
     cashOnDeliveryAmount?: number;
@@ -299,6 +301,22 @@ class AramexService {
   }
 
   /**
+   * Check if the service is initialized
+   */
+  isInitialized(): boolean {
+    return !!this.config;
+  }
+
+  /**
+   * Ensure service is initialized, throw error if not
+   */
+  ensureInitialized(): void {
+    if (!this.config) {
+      throw new Error("Aramex service not initialized. Call initialize() first.");
+    }
+  }
+
+  /**
    * Convert Date to Aramex .NET JSON date format: /Date(timestamp)/
    */
   private formatAramexDate(date: Date | string): string {
@@ -310,18 +328,17 @@ class AramexService {
    * Get ClientInfo object for API requests
    */
   private getClientInfo() {
-    if (!this.config) {
-      throw new Error("Aramex service not initialized. Call initialize() first.");
-    }
+    this.ensureInitialized();
+    const config = this.config!; // Safe after ensureInitialized()
     return {
-      AccountNumber: this.config.accountNumber,
-      UserName: this.config.userName,
-      Password: this.config.password,
-      Version: this.config.version || "v1.0",
-      AccountPin: this.config.accountPin,
-      AccountEntity: this.config.accountEntity,
-      AccountCountryCode: this.config.accountCountryCode,
-      Source: this.config.source ?? 0,
+      AccountNumber: config.accountNumber,
+      UserName: config.userName,
+      Password: config.password,
+      Version: config.version || "v1.0",
+      AccountPin: config.accountPin,
+      AccountEntity: config.accountEntity,
+      AccountCountryCode: config.accountCountryCode,
+      Source: config.source ?? 0,
       PreferredLanguageCode: null,
     };
   }
@@ -330,24 +347,73 @@ class AramexService {
    * Make API request to Aramex
    */
   private async makeRequest(endpoint: string, payload: any): Promise<any> {
-    if (!this.config) {
-      throw new Error("Aramex service not initialized. Call initialize() first.");
-    }
+    this.ensureInitialized();
+    const config = this.config!; // Safe after ensureInitialized()
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    const requestBody = {
+      ClientInfo: this.getClientInfo(),
+      ...payload,
+    };
+
+    console.log(`📤 Aramex API Request to ${endpoint}:`, {
+      url: `${this.baseUrl}${endpoint}`,
+      clientInfo: {
+        AccountNumber: config.accountNumber,
+        UserName: config.userName,
+        AccountEntity: config.accountEntity,
+        AccountCountryCode: config.accountCountryCode,
       },
-      body: JSON.stringify({
-        ClientInfo: this.getClientInfo(),
-        ...payload,
-      }),
+      payloadKeys: Object.keys(payload),
     });
 
+    // Create AbortController for timeout handling
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === "AbortError") {
+        throw new Error(
+          `Aramex API request timed out after 30 seconds. Please check your network connection and try again. ` +
+          `If the issue persists, verify that the Aramex API URL (${this.baseUrl}) is correct and accessible.`
+        );
+      }
+      if (fetchError.message?.includes("Failed to fetch") || fetchError.message?.includes("ERR_CONNECTION")) {
+        throw new Error(
+          `Unable to connect to Aramex API. This could be due to:\n` +
+          `- Network connectivity issues\n` +
+          `- CORS restrictions (if testing from browser)\n` +
+          `- Incorrect API URL (current: ${this.baseUrl})\n` +
+          `- API server is down or unreachable\n\n` +
+          `Please verify your network connection and Aramex API configuration.`
+        );
+      }
+      throw fetchError;
+    }
+
+    console.log(`📥 Aramex API Response Status: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: "Unknown error" }));
-      throw new Error(`Aramex API error: ${error.message || response.statusText}`);
+      const errorText = await response.text();
+      console.error("❌ Aramex API Error Response:", errorText);
+      let error;
+      try {
+        error = JSON.parse(errorText);
+      } catch {
+        error = { message: errorText || "Unknown error" };
+      }
+      throw new Error(`Aramex API error (${response.status}): ${error.message || response.statusText}`);
     }
 
     const data = await response.json();
@@ -356,7 +422,14 @@ class AramexService {
     if (data.Notifications && data.Notifications.length > 0) {
       const errors = data.Notifications.filter((n: any) => n.Type === "Error");
       if (errors.length > 0) {
-        throw new Error(`Aramex error: ${errors.map((e: any) => e.Message).join(", ")}`);
+        const errorMessages = errors.map((e: any) => e.Message || e.message || JSON.stringify(e)).join(", ");
+        console.error("❌ Aramex API Notifications Errors:", errors);
+        throw new Error(`Aramex error: ${errorMessages}`);
+      }
+      // Log warnings/info notifications
+      const warnings = data.Notifications.filter((n: any) => n.Type === "Warning" || n.Type === "Info");
+      if (warnings.length > 0) {
+        console.warn("⚠️ Aramex API Notifications:", warnings);
       }
     }
 
@@ -404,7 +477,7 @@ class AramexService {
           POBox: null,
           Description: null,
         },
-        PreferredCurrencyCode: request.details.customsValueCurrency || "USD",
+        PreferredCurrencyCode: request.details.customsValueCurrency || "SAR",
         ShipmentDetails: {
           Dimensions: null,
           ActualWeight: {
@@ -417,8 +490,8 @@ class AramexService {
                 Unit: request.details.chargeableWeight.unit,
               }
             : null,
-          DescriptionOfGoods: request.details.descriptionOfGoods || null,
-          GoodsOriginCountry: null,
+          DescriptionOfGoods: request.details.descriptionOfGoods || "Parcel",
+          GoodsOriginCountry: request.shipper.countryCode,
           NumberOfPieces: request.details.numberOfPieces,
           ProductGroup: request.details.productGroup,
           ProductType: request.details.productType,
@@ -449,9 +522,74 @@ class AramexService {
       }
     );
 
+    // Log full response for debugging
+    console.log("🔍 Aramex Rate Calculation Raw Response:", JSON.stringify(data, null, 2));
+
+    // Parse TotalAmount - it can be an object with Value/Amount properties or a number
+    let totalAmount = 0;
+    let currencyCode = "SAR";
+
+    // Check various possible response structures
+    if (data.TotalAmount) {
+      if (typeof data.TotalAmount === "number") {
+        totalAmount = data.TotalAmount;
+        console.log("✅ Found TotalAmount as number:", totalAmount);
+      } else if (typeof data.TotalAmount === "object") {
+        // Try Value property first
+        if (data.TotalAmount.Value !== undefined && data.TotalAmount.Value !== null) {
+          totalAmount = typeof data.TotalAmount.Value === "number" 
+            ? data.TotalAmount.Value 
+            : parseFloat(data.TotalAmount.Value) || 0;
+          currencyCode = data.TotalAmount.CurrencyCode || currencyCode;
+          console.log("✅ Found TotalAmount.Value:", totalAmount, currencyCode);
+        } 
+        // Try Amount property
+        else if (data.TotalAmount.Amount !== undefined && data.TotalAmount.Amount !== null) {
+          totalAmount = typeof data.TotalAmount.Amount === "number"
+            ? data.TotalAmount.Amount
+            : parseFloat(data.TotalAmount.Amount) || 0;
+          currencyCode = data.TotalAmount.CurrencyCode || currencyCode;
+          console.log("✅ Found TotalAmount.Amount:", totalAmount, currencyCode);
+        }
+        // Try other possible property names
+        else if (data.TotalAmount.total !== undefined) {
+          totalAmount = typeof data.TotalAmount.total === "number"
+            ? data.TotalAmount.total
+            : parseFloat(data.TotalAmount.total) || 0;
+          console.log("✅ Found TotalAmount.total:", totalAmount);
+        }
+      }
+    }
+
+    // Try alternative response structures
+    if (totalAmount === 0) {
+      if (data.Amount !== undefined) {
+        totalAmount = typeof data.Amount === "number" ? data.Amount : parseFloat(data.Amount) || 0;
+        console.log("✅ Found Amount at root:", totalAmount);
+      } else if (data.Total !== undefined) {
+        totalAmount = typeof data.Total === "number" ? data.Total : parseFloat(data.Total) || 0;
+        console.log("✅ Found Total at root:", totalAmount);
+      } else if (data.Rate !== undefined) {
+        totalAmount = typeof data.Rate === "number" ? data.Rate : parseFloat(data.Rate) || 0;
+        console.log("✅ Found Rate at root:", totalAmount);
+      }
+    }
+
+    // Fallback to CurrencyCode at root level if not in TotalAmount
+    if (data.CurrencyCode && currencyCode === "SAR") {
+      currencyCode = data.CurrencyCode;
+    }
+
+    // Log parsed result
+    console.log("💰 Parsed Rate:", { totalAmount, currencyCode });
+    
+    if (totalAmount === 0) {
+      console.warn("⚠️ Warning: Rate calculation returned 0. Response structure may be different than expected.");
+    }
+
     return {
-      totalAmount: data.TotalAmount?.Value || data.TotalAmount?.Amount || 0,
-      currencyCode: data.TotalAmount?.CurrencyCode || data.CurrencyCode || "SAR",
+      totalAmount,
+      currencyCode,
       productGroup: data.ProductGroup || "",
       productType: data.ProductType || "",
       notifications: data.Notifications || [],
@@ -584,8 +722,8 @@ class AramexService {
                 Unit: request.details.weightUnit.toLowerCase(),
               },
               ChargeableWeight: null,
-              DescriptionOfGoods: request.details.description || "",
-              GoodsOriginCountry: request.consignee.countryCode,
+              DescriptionOfGoods: request.details.description || "Parcel", // Mandatory (M)
+              GoodsOriginCountry: request.details.goodsOriginCountry || request.shipper.countryCode, // Mandatory (M): Use shipper's country
               NumberOfPieces: request.details.numberOfPieces,
               ProductGroup: request.details.productGroup,
               ProductType: request.details.productType,
@@ -845,6 +983,50 @@ class AramexService {
           comments: event.Comments || "",
           problemCode: event.ProblemCode || "",
         })),
+      })),
+      notifications: data.Notifications || [],
+    };
+  }
+
+  /**
+   * Fetch cities for a country (Location Services API)
+   * Used for address validation
+   */
+  async fetchCities(
+    countryCode: string,
+    state?: string,
+    nameStartsWith?: string
+  ): Promise<{
+    cities: Array<{
+      name: string;
+      code?: string;
+    }>;
+    notifications: Array<{
+      code: string;
+      message: string;
+      type: string;
+    }>;
+  }> {
+    const data = await this.makeRequest(
+      "/ShippingAPI.V2/Location/Service_1_0.svc/json/FetchCities",
+      {
+        CountryCode: countryCode,
+        State: state || null,
+        NameStartsWith: nameStartsWith || null,
+        Transaction: {
+          Reference1: "",
+          Reference2: "",
+          Reference3: "",
+          Reference4: "",
+          Reference5: "",
+        },
+      }
+    );
+
+    return {
+      cities: (data.Cities || []).map((city: any) => ({
+        name: city.Name || "",
+        code: city.Code,
       })),
       notifications: data.Notifications || [],
     };

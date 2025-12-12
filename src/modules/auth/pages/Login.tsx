@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
-import { Button, Form, Input, message } from "antd";
+import { Button, Form, Input, App } from "antd";
+
+
 import Logo from "@/components/Logo";
 import loginIcon from "@/assets/login_icon.svg";
 import { login } from "@/services/auth";
@@ -13,13 +15,12 @@ type FormValues = {
 
 export default function Login() {
   const { setRole } = useAuth();
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<string>("");
 
   const onFinish = async (values: FormValues) => {
     try {
       setLoading(true);
-      setDebugInfo("جاري البحث عن الحساب...");
       
       // Supabase auth uses email, so we'll use phone as email or find user by phone
       // First try to find user by phone in profiles table to get their email
@@ -45,7 +46,6 @@ export default function Login() {
       };
       
       const normalizedPhone = normalizePhone(values.phone);
-      setDebugInfo(`البحث عن رقم الهاتف: ${values.phone} → ${normalizedPhone}`);
       
       // Try multiple phone formats
       const phoneVariations = [
@@ -55,8 +55,6 @@ export default function Login() {
         `+966${normalizedPhone.substring(1)}`,
         `966${normalizedPhone.substring(1)}`,
       ];
-      
-      setDebugInfo(`محاولة البحث بالصيغ: ${phoneVariations.join(', ')}`);
       
       let profile = null;
       let profileError = null;
@@ -69,50 +67,71 @@ export default function Login() {
             phone_number: phoneFormat
           });
           
-          // Log for debugging (always log, even in production)
+          // Log for debugging (console only, not visible to users)
           console.log(`[LOGIN DEBUG] Trying phone format: ${phoneFormat}`, { data, error });
-          setDebugInfo(`محاولة: ${phoneFormat}... ${error ? `خطأ: ${error.message}` : data ? 'تم!' : 'لا يوجد'}`);
           
           if (error) {
+            // Check if it's a network error (including timeout errors)
+            const errorMessage = error.message || '';
+            const errorDetails = error.details || '';
+            const isNetworkError = 
+              errorMessage.includes('Failed to fetch') ||
+              errorMessage.includes('ERR_CONNECTION') ||
+              errorMessage.includes('ERR_QUIC') ||
+              errorMessage.includes('ERR_CONNECTION_TIMED_OUT') ||
+              errorMessage.includes('timeout') ||
+              errorMessage.includes('NetworkError') ||
+              errorDetails.includes('Failed to fetch') ||
+              errorDetails.includes('ERR_CONNECTION') ||
+              errorDetails.includes('timeout');
+            
+            if (isNetworkError) {
+              // Network error - stop trying and show error to user
+              setLoading(false);
+              message.error("خطأ في الاتصال بالشبكة. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.");
+              return;
+            }
+            
             console.error(`[LOGIN DEBUG] RPC error for ${phoneFormat}:`, error);
-            console.error(`[LOGIN DEBUG] Error details:`, {
-              message: error.message,
-              code: error.code,
-              details: error.details,
-              hint: error.hint
-            });
             profileError = error;
-            // Continue to next format
+            // Continue to next format for non-network errors
             continue;
           }
           
           if (data && Array.isArray(data) && data.length > 0) {
             profile = data[0];
-            setDebugInfo(`✅ تم العثور على الحساب باستخدام الصيغة: ${phoneFormat}`);
             console.log('[LOGIN DEBUG] Found profile:', profile);
             break;
-          } else {
-            console.log(`[LOGIN DEBUG] No data returned for ${phoneFormat}`);
           }
         } catch (rpcError: any) {
+          // Check if it's a network error (including timeout errors)
+          const errorMessage = rpcError?.message || '';
+          const errorStack = rpcError?.stack || '';
+          const isNetworkError = 
+            errorMessage.includes('Failed to fetch') ||
+            errorMessage.includes('ERR_CONNECTION') ||
+            errorMessage.includes('ERR_QUIC') ||
+            errorMessage.includes('ERR_CONNECTION_TIMED_OUT') ||
+            errorMessage.includes('timeout') ||
+            errorMessage.includes('NetworkError') ||
+            errorStack.includes('ERR_CONNECTION_TIMED_OUT') ||
+            errorStack.includes('Failed to fetch');
+          
+          if (isNetworkError) {
+            // Network error - stop trying and show error to user
+            setLoading(false);
+            message.error("خطأ في الاتصال بالشبكة. يرجى التحقق من اتصال الإنترنت والمحاولة مرة أخرى.");
+            return;
+          }
+          
           console.error(`[LOGIN DEBUG] RPC call failed for ${phoneFormat}:`, rpcError);
-          console.error(`[LOGIN DEBUG] Exception details:`, {
-            message: rpcError?.message,
-            stack: rpcError?.stack,
-            name: rpcError?.name
-          });
           profileError = rpcError;
           continue;
         }
       }
       
       if (!profile || !profile.email) {
-        if (profileError) {
-          setDebugInfo(`خطأ في البحث: ${profileError.message}`);
-          console.error("Profile lookup error:", profileError);
-        } else {
-          setDebugInfo("لم يتم العثور على حساب بهذا الرقم");
-        }
+        console.error("Profile lookup error:", profileError);
         setLoading(false);
         message.error("لم يتم العثور على حساب بهذا الرقم. يرجى التحقق من رقم الهاتف أو إنشاء حساب جديد.");
         return;
@@ -120,17 +139,14 @@ export default function Login() {
       
       const loginEmail = profile.email;
       const userRole = profile.role || "client";
-      setDebugInfo(`تم العثور على الحساب! البريد: ${loginEmail}, الدور: ${userRole}`);
       
       // Try login with email
-      setDebugInfo("جاري تسجيل الدخول...");
       const loginResult = await login({
         email: loginEmail,
         password: values.password,
       });
       
       if (!loginResult.session) {
-        setDebugInfo("فشل تسجيل الدخول: لا توجد جلسة");
         setLoading(false);
         message.warning("يرجى التحقق من رقم الهاتف لتأكيد الحساب أولاً");
         return;
@@ -138,7 +154,6 @@ export default function Login() {
       
       // Get user role from session
       const finalRole = loginResult.user?.user_metadata?.role || userRole || "client";
-      setDebugInfo(`تم تسجيل الدخول بنجاح! الدور: ${finalRole}`);
       
       // Update role in context
       setRole(finalRole as any);
@@ -155,24 +170,15 @@ export default function Login() {
       };
       
       const targetRoute = roleRoutes[finalRole] || "/client/profile";
-      setDebugInfo(`جاري التوجيه إلى: ${targetRoute}`);
       
       // Reset loading before navigation
       setLoading(false);
       
       // Navigate immediately - auth context will update via onAuthStateChange
       setTimeout(() => {
-        setDebugInfo(`التوجيه الآن إلى: ${targetRoute}`);
         window.location.href = targetRoute;
       }, 500);
     } catch (error: any) {
-      const errorDetails = {
-        message: error?.message,
-        status: error?.status,
-        name: error?.name,
-      };
-      
-      setDebugInfo(`خطأ: ${JSON.stringify(errorDetails, null, 2)}`);
       setLoading(false);
       
       let errorMessage = "فشل تسجيل الدخول. تحقق من البيانات المدخلة.";
@@ -257,14 +263,6 @@ export default function Login() {
                     تسجيل الدخول
                   </Button>
                 </Form.Item>
-                
-                {debugInfo && (
-                  <div className="mt-4 p-3 bg-gray-100 rounded-lg text-xs text-gray-700 font-mono whitespace-pre-wrap">
-                    <strong>معلومات التصحيح:</strong>
-                    <br />
-                    {debugInfo}
-                  </div>
-                )}
               </Form>
             </div>
 

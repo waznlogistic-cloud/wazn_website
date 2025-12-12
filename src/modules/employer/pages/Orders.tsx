@@ -2,11 +2,10 @@ import { Table, Tag, Button, Spin, Empty } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { EyeOutlined } from "@ant-design/icons";
 import type { Order } from "@/modules/core/types/order";
-import OrderDetailsModal from "@/modules/core/components/OrderDetailsModal";
 import { useState, useEffect } from "react";
 import { getOrders } from "@/services/orders";
 import { useAuth } from "@/contexts/authContext";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 
 // Mock data - fallback if no real data
@@ -142,8 +141,7 @@ const statusText: Record<Order["status"], string> = {
 export default function Orders() {
   const { user, role } = useAuth();
   const location = useLocation();
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -196,6 +194,17 @@ export default function Orders() {
         provider_id: order.provider_id,
         driver_id: order.driver_id,
         employer_id: order.employer_id,
+        // Aramex integration fields
+        aramex_shipment_id: order.aramex_shipment_id,
+        aramex_tracking_number: order.aramex_tracking_number,
+        aramex_label_url: order.aramex_label_url,
+        // Payment integration fields
+        payment_status: order.payment_status,
+        tap_charge_id: order.tap_charge_id,
+        payment_amount: order.payment_amount,
+        payment_currency: order.payment_currency || "SAR",
+        payment_method: order.payment_method,
+        paid_at: order.paid_at,
       }));
 
       setOrders(transformedOrders);
@@ -209,8 +218,7 @@ export default function Orders() {
   };
 
   const handleView = (order: Order) => {
-    setSelectedOrder(order);
-    setIsModalOpen(true);
+    navigate(`/employer/orders/${order.id}`);
   };
 
   const formatDate = (dateString?: string) => {
@@ -230,17 +238,17 @@ export default function Orders() {
 
   const columns: ColumnsType<Order> = [
     {
-      title: "رقم الطلب",
+      title: "رقم الشحنة",
       dataIndex: "trackingNo",
       key: "trackingNo",
-      width: 120,
+      width: 140,
     },
     {
-      title: "نوع الشحن",
-      dataIndex: "shipType",
-      key: "shipType",
-      width: 120,
-      render: (shipType: string) => getShipTypeText(shipType),
+      title: "شركة الشحن",
+      dataIndex: "company",
+      key: "company",
+      width: 150,
+      render: (company: string) => company || "-",
     },
     {
       title: "تاريخ الشحن",
@@ -257,13 +265,20 @@ export default function Orders() {
       render: (date: string) => formatDate(date),
     },
     {
-      title: "الشركة",
-      dataIndex: "company",
-      key: "company",
+      title: "السعر",
+      dataIndex: "price",
+      key: "price",
       width: 120,
+      render: (price: number, record: Order) => {
+        // Show payment_amount if available, otherwise show price
+        if (record.payment_amount) {
+          return `${record.payment_amount} ${record.payment_currency || "SAR"}`;
+        }
+        return price ? `${price} ر.س` : "-";
+      },
     },
     {
-      title: "الحالة",
+      title: "حالة الطلب",
       dataIndex: "status",
       key: "status",
       width: 120,
@@ -323,12 +338,6 @@ export default function Orders() {
         />
       )}
 
-      <OrderDetailsModal
-        open={isModalOpen}
-        order={selectedOrder}
-        onClose={() => setIsModalOpen(false)}
-        role="employer"
-      />
     </div>
   );
 }

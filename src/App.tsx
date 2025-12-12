@@ -1,4 +1,4 @@
-import { ConfigProvider } from "antd";
+import { ConfigProvider, App } from "antd";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { QueryProvider } from "@/contexts/queryClient";
@@ -16,6 +16,7 @@ const RegisterDriver = lazy(() => import("@/modules/auth/pages/register/Register
 const UserTypeSelection = lazy(() => import("@/modules/onboarding/pages/UserTypeSelection"));
 // Core
 const OtpVerification = lazy(() => import("@/modules/core/pages/OtpVerification"));
+const PaymentSuccess = lazy(() => import("@/modules/core/pages/PaymentSuccess"));
 // Admin
 const AdminHome = lazy(() => import("@/modules/admin/pages/Home"));
 const AdminOrders = lazy(() => import("@/modules/admin/pages/Orders"));
@@ -25,9 +26,11 @@ const AdminPayments = lazy(() => import("@/modules/admin/pages/Payments"));
 const AdminNotifications = lazy(() => import("@/modules/admin/pages/Notifications"));
 const AdminTerms = lazy(() => import("@/modules/admin/pages/Terms"));
 // Employer
+const EmployerHome = lazy(() => import("@/modules/employer/pages/Home"));
 const EmployerProfile = lazy(() => import("@/modules/employer/pages/Profile"));
 const EmployerOrders = lazy(() => import("@/modules/employer/pages/Orders"));
-const EmployerCreateOrder = lazy(() => import("@/modules/employer/pages/CreateOrder"));
+const EmployerOrderDetail = lazy(() => import("@/modules/employer/pages/OrderDetail"));
+const EmployerCreateOrder = lazy(() => import("@/modules/employer/pages/CreateOrderMultiStep"));
 const EmployerBilling = lazy(() => import("@/modules/employer/pages/Billing"));
 const EmployerTerms = lazy(() => import("@/modules/employer/pages/Terms"));
 // Provider
@@ -54,12 +57,13 @@ const OrderConfirmation = lazy(() => import("@/modules/client/pages/OrderConfirm
 // Landing
 const LandingPage = lazy(() => import("@/modules/landing/pages/LandingPage"));
 
-export default function App() {
+export default function AppComponent() {
   return (
     <ConfigProvider direction="rtl" theme={antdTheme}>
-      <BrowserRouter>
-        <QueryProvider>
-          <Suspense fallback={
+      <App>
+        <BrowserRouter>
+          <QueryProvider>
+            <Suspense fallback={
             <div style={{ 
               minHeight: "100vh", 
               display: "flex", 
@@ -82,6 +86,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/logout" element={<Logout />} />
               <Route path="/otp-verification" element={<OtpVerification />} />
+              <Route path="/payment/success" element={<PaymentSuccess />} />
 
               {/* Admin */}
               <Route
@@ -143,6 +148,14 @@ export default function App() {
 
               {/* Employer */}
               <Route
+                path="/employer/home"
+                element={
+                  <MainLayout>
+                    <EmployerHome />
+                  </MainLayout>
+                }
+              />
+              <Route
                 path="/employer/profile"
                 element={
                   <MainLayout>
@@ -155,6 +168,14 @@ export default function App() {
                 element={
                   <MainLayout>
                     <EmployerOrders />
+                  </MainLayout>
+                }
+              />
+              <Route
+                path="/employer/orders/:id"
+                element={
+                  <MainLayout>
+                    <EmployerOrderDetail />
                   </MainLayout>
                 }
               />
@@ -336,6 +357,7 @@ export default function App() {
           </Suspense>
         </QueryProvider>
       </BrowserRouter>
+      </App>
     </ConfigProvider>
   );
 }

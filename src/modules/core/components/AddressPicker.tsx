@@ -5,6 +5,7 @@ import { EnvironmentOutlined } from "@ant-design/icons";
 interface AddressPickerProps {
   value?: string;
   onChange?: (address: string) => void;
+  onLocationChange?: (location: { address: string; lat: number; lng: number } | null) => void;
   placeholder?: string;
 }
 
@@ -36,6 +37,7 @@ function MapClickHandler({
 export default function AddressPicker({
   value,
   onChange,
+  onLocationChange,
   placeholder = "ابحث عن العنوان أو انقر على الخريطة",
 }: AddressPickerProps) {
   const [address, setAddress] = useState(value || "");
@@ -97,11 +99,13 @@ export default function AddressPicker({
           const addressText = data.display_name;
           setAddress(addressText);
           onChange?.(addressText);
+          onLocationChange?.({ address: addressText, lat, lng });
         } else {
           // Fallback to coordinates
           const addressText = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
           setAddress(addressText);
           onChange?.(addressText);
+          onLocationChange?.({ address: addressText, lat, lng });
         }
       } catch (error) {
         console.error("Geocoding error:", error);
@@ -146,6 +150,7 @@ export default function AddressPicker({
             setMapCenter([lat, lng]);
             setIsMapVisible(true);
             onChange?.(addressText);
+            onLocationChange?.({ address: addressText, lat, lng });
           }
         } catch (error) {
           console.error("Search error:", error);
@@ -170,6 +175,12 @@ export default function AddressPicker({
     const newValue = e.target.value;
     setAddress(newValue);
     onChange?.(newValue);
+    
+    // Clear location if address is cleared
+    if (!newValue) {
+      setSelectedLocation(null);
+      onLocationChange?.(null);
+    }
     
     // Trigger search if user is typing
     if (newValue.length >= 3) {

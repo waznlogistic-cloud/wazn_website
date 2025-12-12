@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState, useEffect, useCallback } from "react";
 import type { PropsWithChildren } from "react";
 import { supabase } from "@/lib/supabase";
-import type { User } from "@supabase/supabase-js";
+import type { User, Session, AuthChangeEvent } from "@supabase/supabase-js";
 
 export type RoleKey = "admin" | "employer" | "provider" | "driver" | "client" | "guest";
 
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     // of truth prevents race conditions between initial fetch and listener.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
       if (session?.user) {
         setUser(session.user);
         // Use consistent role-fetching logic for all auth state changes
@@ -69,7 +69,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     // Get initial session as a fallback for error handling
     // onAuthStateChange fires immediately, so this mainly handles error cases
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }: { data: { session: any }, error: any }) => {
       if (error) {
         console.error("Error getting session:", error);
         setLoading(false);
@@ -108,13 +108,25 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [user]);
 
   const logout = useCallback(async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error("Error signing out:", error);
-      return;
+    try {
+      // Try to sign out, but don't fail if network is unavailable
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        // Only log network errors, don't block logout
+        if (!error.message.includes('Failed to fetch') && !error.message.includes('ERR_CONNECTION')) {
+          console.error("Error signing out:", error);
+        }
+      }
+    } catch (err: any) {
+      // Network errors shouldn't prevent logout
+      if (!err?.message?.includes('Failed to fetch') && !err?.message?.includes('ERR_CONNECTION')) {
+        console.error("Error signing out:", err);
+      }
+    } finally {
+      // Always clear local state, even if network request fails
+      setUser(null);
+      setRole("guest");
     }
-    setUser(null);
-    setRole("guest");
   }, []);
 
   const value = useMemo(

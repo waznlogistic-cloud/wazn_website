@@ -42,8 +42,9 @@ Based on the email from Aramex, we need to implement:
 - Save tracking number to database
 
 ### Step 3: Environment Variables
-- Add Aramex credentials to `.env`
-- Update Vercel environment variables
+- Copy `.env.example` to `.env.local`
+- Add Aramex credentials to `.env.local` (gitignored)
+- Update Vercel environment variables for production
 
 ### Step 4: Database Updates
 - Already have `aramex_tracking_no` field in orders table
@@ -64,10 +65,25 @@ Based on the email from Aramex, we need to implement:
 
 ## Current Status
 
-- ✅ Service structure exists
-- ✅ Basic createShipment method exists
-- ✅ Basic trackShipment method exists
-- ⏳ Need to add Rate Calculation
-- ⏳ Need to add Pickup management
-- ⏳ Need to integrate into order flow
+- ✅ Service structure complete
+- ✅ Create Shipment API implemented
+- ✅ Track Shipment API implemented
+- ✅ Rate Calculation API implemented
+- ✅ Create/Cancel Pickup API implemented
+- ✅ Print Label API implemented
+- ✅ Fetch Cities API implemented
+- ✅ Integrated into order creation flow
+- ✅ Address parsing utility created
+- ✅ Product type mapping configured
+- ✅ Environment variables configured
+- ✅ Error handling implemented
+- ✅ Testing guide created
+
+## Next Steps
+
+- ⏳ Test with sandbox credentials
+- ⏳ Add retry mechanism for failed syncs
+- ⏳ Add webhook support for shipment status updates
+- ⏳ Add rate calculation before order creation (optional)
+- ⏳ Add manual sync button for failed orders
 

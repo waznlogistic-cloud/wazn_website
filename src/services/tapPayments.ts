@@ -8,8 +8,11 @@
 export interface TapConfig {
   secretKey: string;
   publicKey: string;
-  apiUrl?: string; // Default: https://api.tap.company/v2
+  merchantId?: string;
+  apiUrl?: string; // Default: https://api.tap.company/v2/
   redirectUrl?: string;
+  webhookUrl?: string;
+  currency?: string; // Default: SAR
 }
 
 export interface TapChargeRequest {
@@ -106,7 +109,47 @@ class TapPaymentsService {
       throw new Error("Tap Payments service not initialized. Call initialize() first.");
     }
 
-    const apiUrl = this.config.apiUrl || "https://api.tap.company/v2";
+    const apiUrl = (this.config.apiUrl || "https://api.tap.company/v2/").replace(/\/$/, ""); // Remove trailing slash
+    
+    // Build charge payload with all mandatory fields
+    const chargePayload: any = {
+      amount: request.amount,
+      currency: request.currency || this.config.currency || "SAR",
+      customer: {
+        first_name: request.customer.firstName,
+        last_name: request.customer.lastName || "",
+        email: request.customer.email,
+        phone: {
+          country_code: request.customer.phone.countryCode,
+          number: request.customer.phone.number,
+        },
+      },
+      merchant: {
+        id: request.merchant.id || this.config.merchantId || "",
+      },
+      // Set source.id to "src_all" to display all payment methods on Tap hosted page
+      source: {
+        id: request.source?.id || "src_all",
+      },
+      redirect: {
+        url: request.redirect?.url || this.config.redirectUrl || `${window.location.origin}/payment/success`,
+      },
+      // Mandatory: Webhook URL for payment status updates
+      post: {
+        url: request.post?.url || this.config.webhookUrl || `${window.location.origin}/api/tap/webhook`,
+      },
+    };
+
+    // Add optional fields if provided
+    if (request.description) {
+      chargePayload.description = request.description;
+    }
+    if (request.metadata) {
+      chargePayload.metadata = request.metadata;
+    }
+    if (request.reference) {
+      chargePayload.reference = request.reference;
+    }
     
     const response = await fetch(`${apiUrl}/charges`, {
       method: "POST",
@@ -114,32 +157,7 @@ class TapPaymentsService {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${this.config.secretKey}`,
       },
-      body: JSON.stringify({
-        amount: request.amount,
-        currency: request.currency,
-        customer: {
-          first_name: request.customer.firstName,
-          last_name: request.customer.lastName || "",
-          email: request.customer.email,
-          phone: {
-            country_code: request.customer.phone.countryCode,
-            number: request.customer.phone.number,
-          },
-        },
-        merchant: {
-          id: request.merchant.id,
-        },
-        source: request.source,
-        redirect: request.redirect || {
-          url: this.config.redirectUrl || `${window.location.origin}/payment/callback`,
-        },
-        post: request.post || {
-          url: `${window.location.origin}/api/webhooks/tap`,
-        },
-        description: request.description,
-        metadata: request.metadata,
-        reference: request.reference,
-      }),
+      body: JSON.stringify(chargePayload),
     });
 
     if (!response.ok) {
@@ -174,7 +192,7 @@ class TapPaymentsService {
       throw new Error("Tap Payments service not initialized. Call initialize() first.");
     }
 
-    const apiUrl = this.config.apiUrl || "https://api.tap.company/v2";
+    const apiUrl = (this.config.apiUrl || "https://api.tap.company/v2/").replace(/\/$/, ""); // Remove trailing slash
     
     const response = await fetch(`${apiUrl}/charges/${chargeId}`, {
       method: "GET",

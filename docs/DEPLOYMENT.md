@@ -57,13 +57,14 @@ Follow the platform's documentation for:
 
 Ensure all database migrations are applied:
 
-1. Run `database/schema.sql`
-2. Run `database/schema_enhanced.sql`
-3. Run `database/rls_policies.sql`
-4. Run `database/rls_policies_enhanced.sql`
-5. Run `database/fix_login_rls.sql`
-6. Run `database/storage_setup.sql`
-7. Run `database/triggers.sql`
+1. Run `database/schema.sql` - Base tables
+2. Run `database/schema_enhanced.sql` - Payment tables
+3. Run `database/rls_policies.sql` - Base RLS policies
+4. Run `database/rls_policies_enhanced.sql` - Payment RLS policies
+5. Run `database/fix_login_rls.sql` - Login RLS function
+6. Run `database/storage_setup.sql` - Storage buckets
+7. Run `database/triggers.sql` - Auto-update triggers
+8. Run `database/integrations_schema.sql` - Integration fields (Aramex, Tap Payments, Mrsool)
 
 ## Post-Deployment Checklist
 

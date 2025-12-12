@@ -7,7 +7,7 @@ Integration with Aramex shipping API for creating shipments and tracking deliver
 
 ### Configuration
 
-Add these environment variables to your `.env` file:
+Copy `.env.example` to `.env.local` and add these environment variables to `.env.local`:
 
 ```env
 VITE_ARAMEX_ENABLED=true
@@ -73,7 +73,7 @@ Integration with Tap Payments for processing payments.
 
 ### Configuration
 
-Add these environment variables to your `.env` file:
+Copy `.env.example` to `.env.local` and add these environment variables to `.env.local`:
 
 ```env
 VITE_TAP_ENABLED=true

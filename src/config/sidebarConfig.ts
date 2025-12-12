@@ -34,6 +34,7 @@ export const sidebarConfig: Record<RoleKey, SidebarItem[]> = {
     { key: "terms", label: "الشروط والأحكام", path: "/admin/terms", icon: ReadOutlined },
   ],
   employer: [
+    { key: "home", label: "الرئيسية", path: "/employer/home", icon: HomeOutlined },
     { key: "profile", label: "معلوماتي", path: "/employer/profile", icon: IdcardOutlined },
     { key: "orders", label: "الطلبات", path: "/employer/orders", icon: ShoppingOutlined },
     {

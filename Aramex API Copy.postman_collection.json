@@ -1,0 +1,207 @@
+{
+	"info": {
+		"_postman_id": "e22e12b8-d7e7-44b7-aaff-81d0b212cfe9",
+		"name": "Aramex API Copy",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "24395956",
+		"_collection_link": "https://red-trinity-159935.postman.co/workspace/Team-Workspace~f93f9280-a02c-416c-8a9e-46d90a608ac8/collection/24395956-e22e12b8-d7e7-44b7-aaff-81d0b212cfe9?action=share&source=collection_link&creator=24395956"
+	},
+	"item": [
+		{
+			"name": "FetchCities",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"CountryCode\": \"SA\",\r\n  \"State\": null,\r\n  \"NameStartsWith\": null,\r\n  \"ClientInfo\": {\r\n    \"UserName\": \"\",\r\n    \"Password\": \"\",\r\n    \"Version\": \"v1.0\",\r\n    \"AccountNumber\": \"\",\r\n    \"AccountPin\": \"\",\r\n    \"AccountEntity\": \"\",\r\n    \"AccountCountryCode\": \"SA\",\r\n    \"Source\": 0,\r\n    \"PreferredLanguageCode\": null\r\n  },\r\n  \"Transaction\": {\r\n    \"Reference1\": \"001\",\r\n    \"Reference2\": \"002\",\r\n    \"Reference3\": \"003\",\r\n    \"Reference4\": \"004\",\r\n    \"Reference5\": \"005\"\r\n  }\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://ws.aramex.net/ShippingAPI.V2/Location/Service_1_0.svc/json/FetchCities",
+					"protocol": "https",
+					"host": [
+						"ws",
+						"aramex",
+						"net"
+					],
+					"path": [
+						"ShippingAPI.V2",
+						"Location",
+						"Service_1_0.svc",
+						"json",
+						"FetchCities"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CalculateRate",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"ClientInfo\": {\r\n        \"UserName\": \"\",\r\n        \"Password\": \"\",\r\n        \"Version\": \"v1\",\r\n        \"AccountNumber\": \"\",\r\n        \"AccountPin\": \"\",\r\n        \"AccountEntity\": \"DHA\",\r\n        \"AccountCountryCode\": \"SA\",\r\n        \"Source\": 24\r\n    },\r\n    \"DestinationAddress\": {\r\n        \"Line1\": \"XYZ Street\",\r\n        \"Line2\": \"Unit # 1\",\r\n        \"Line3\": \"\",\r\n        \"City\": \"Dubai\",\r\n        \"StateOrProvinceCode\": \"\",\r\n        \"PostCode\": \"\",\r\n        \"CountryCode\": \"AE\",\r\n        \"Longitude\": 0,\r\n        \"Latitude\": 0,\r\n        \"BuildingNumber\": null,\r\n        \"BuildingName\": null,\r\n        \"Floor\": null,\r\n        \"Apartment\": null,\r\n        \"POBox\": null,\r\n        \"Description\": null\r\n    },\r\n    \"OriginAddress\": {\r\n        \"Line1\": \"ABC Street\",\r\n        \"Line2\": \"Unit # 1\",\r\n        \"Line3\": \"\",\r\n        \"City\": \"Amman\",\r\n        \"StateOrProvinceCode\": \"\",\r\n        \"PostCode\": \"\",\r\n        \"CountryCode\": \"JO\",\r\n        \"Longitude\": 0,\r\n        \"Latitude\": 0,\r\n        \"BuildingNumber\": null,\r\n        \"BuildingName\": null,\r\n        \"Floor\": null,\r\n        \"Apartment\": null,\r\n        \"POBox\": null,\r\n        \"Description\": null\r\n    },\r\n    \"PreferredCurrencyCode\": \"USD\",\r\n    \"ShipmentDetails\": {\r\n        \"Dimensions\": null,\r\n        \"ActualWeight\": {\r\n            \"Unit\": \"KG\",\r\n            \"Value\": 1\r\n        },\r\n        \"ChargeableWeight\": null,\r\n        \"DescriptionOfGoods\": null,\r\n        \"GoodsOriginCountry\": null,\r\n        \"NumberOfPieces\": 1,\r\n        \"ProductGroup\": \"EXP\",\r\n        \"ProductType\": \"PPX\",\r\n        \"PaymentType\": \"P\",\r\n        \"PaymentOptions\": \"\",\r\n        \"CustomsValueAmount\": null,\r\n        \"CashOnDeliveryAmount\": null,\r\n        \"InsuranceAmount\": null,\r\n        \"CashAdditionalAmount\": null,\r\n        \"CashAdditionalAmountDescription\": null,\r\n        \"CollectAmount\": null,\r\n        \"Services\": \"\",\r\n        \"Items\": null,\r\n        \"DeliveryInstructions\": null\r\n    },\r\n    \"Transaction\": {\r\n        \"Reference1\": \"\",\r\n        \"Reference2\": \"\",\r\n        \"Reference3\": \"\",\r\n        \"Reference4\": \"\",\r\n        \"Reference5\": \"\"\r\n    }\r\n}"
+				},
+				"url": {
+					"raw": "https://ws.aramex.net/ShippingAPI.V2/RateCalculator/Service_1_0.svc/json/CalculateRate",
+					"protocol": "https",
+					"host": [
+						"ws",
+						"aramex",
+						"net"
+					],
+					"path": [
+						"ShippingAPI.V2",
+						"RateCalculator",
+						"Service_1_0.svc",
+						"json",
+						"CalculateRate"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CreateShipments",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"Shipments\": [\r\n    {\r\n      \"Reference1\": \"Order-0001\",\r\n      \"Reference2\": \"\",\r\n      \"Reference3\": \"\",\r\n      \"Shipper\": {\r\n        \"Reference1\": \"Ref 111111\",\r\n        \"Reference2\": \"\",\r\n        \"AccountNumber\": \"\",\r\n        \"PartyAddress\": {\r\n          \"Line1\": \"Mecca St - Hada Dist\",\r\n          \"Line2\": \"\",\r\n          \"Line3\": \"\",\r\n          \"City\": \"Dammam\",\r\n          \"StateOrProvinceCode\": \"\",\r\n          \"PostCode\": \"\",\r\n          \"CountryCode\": \"SA\",\r\n          \"Longitude\": 0.0,\r\n          \"Latitude\": 0.0,\r\n          \"BuildingNumber\": null,\r\n          \"BuildingName\": null,\r\n          \"Floor\": null,\r\n          \"Apartment\": null,\r\n          \"POBox\": null,\r\n          \"Description\": null\r\n        },\r\n        \"Contact\": {\r\n          \"Department\": \"\",\r\n          \"PersonName\": \"Abdulaziz\",\r\n          \"Title\": \"\",\r\n          \"CompanyName\": \"Abdulaziz\",\r\n          \"PhoneNumber1\": \"966590000000\",\r\n          \"PhoneNumber1Ext\": \"\",\r\n          \"PhoneNumber2\": \"\",\r\n          \"PhoneNumber2Ext\": \"\",\r\n          \"FaxNumber\": \"\",\r\n          \"CellPhone\": \"966590000000\",\r\n          \"EmailAddress\": \"test@aramex.com\",\r\n          \"Type\": \"\"\r\n        }\r\n      },\r\n      \"Consignee\": {\r\n        \"Reference1\": \"\",\r\n        \"Reference2\": \"\",\r\n        \"AccountNumber\": \"\",\r\n        \"PartyAddress\": {\r\n          \"Line1\": \"15 ABC St\",\r\n          \"Line2\": \"\",\r\n          \"Line3\": \"\",\r\n          \"City\": \"Riaydh\",\r\n          \"StateOrProvinceCode\": \"\",\r\n          \"PostCode\": \"\",\r\n          \"CountryCode\": \"SA\",\r\n          \"Longitude\": 0.0,\r\n          \"Latitude\": 0.0,\r\n          \"BuildingNumber\": null,\r\n          \"BuildingName\": null,\r\n          \"Floor\": null,\r\n          \"Apartment\": null,\r\n          \"POBox\": null,\r\n          \"Description\": null\r\n        },\r\n        \"Contact\": {\r\n          \"Department\": \"\",\r\n          \"PersonName\": \"Ali\",\r\n          \"Title\": \"\",\r\n          \"CompanyName\": \"Ali\",\r\n          \"PhoneNumber1\": \"966590000000\",\r\n          \"PhoneNumber1Ext\": \"\",\r\n          \"PhoneNumber2\": \"\",\r\n          \"PhoneNumber2Ext\": \"\",\r\n          \"FaxNumber\": \"\",\r\n          \"CellPhone\": \"966590000000\",\r\n          \"EmailAddress\": \"test@aramex.com\",\r\n          \"Type\": \"\"\r\n        }\r\n      },\r\n      \"ThirdParty\": {\r\n        \"Reference1\": \"\",\r\n        \"Reference2\": \"\",\r\n        \"AccountNumber\": \"\",\r\n        \"PartyAddress\": {\r\n          \"Line1\": \"XYZ\",\r\n          \"Line2\": \"\",\r\n          \"Line3\": \"\",\r\n          \"City\": \"Riaydh\",\r\n          \"StateOrProvinceCode\": \"\",\r\n          \"PostCode\": \"\",\r\n          \"CountryCode\": \"SA\",\r\n          \"Longitude\": 0.0,\r\n          \"Latitude\": 0.0,\r\n          \"BuildingNumber\": null,\r\n          \"BuildingName\": null,\r\n          \"Floor\": null,\r\n          \"Apartment\": null,\r\n          \"POBox\": null,\r\n          \"Description\": null\r\n        },\r\n        \"Contact\": {\r\n          \"Department\": \"\",\r\n          \"PersonName\": \"Abdulaziz\",\r\n          \"Title\": \"\",\r\n          \"CompanyName\": \"Klikinz\",\r\n          \"PhoneNumber1\": \"966\",\r\n          \"PhoneNumber1Ext\": \"\",\r\n          \"PhoneNumber2\": \"\",\r\n          \"PhoneNumber2Ext\": \"\",\r\n          \"FaxNumber\": \"\",\r\n          \"CellPhone\": \"966\",\r\n          \"EmailAddress\": \"\",\r\n          \"Type\": \"\"\r\n        }\r\n      },\r\n      \"ShippingDateTime\": \"\\/Date(1667979903000)\\/\",\r\n      \"DueDate\": \"\\/Date(1667979903000)\\/\",\r\n      \"Comments\": \"\",\r\n      \"PickupLocation\": \"Reception\",\r\n      \"OperationsInstructions\": \"\",\r\n      \"AccountingInstrcutions\": \"\",\r\n      \"Details\": {\r\n        \"Dimensions\": {\r\n          \"Length\": 0.0,\r\n          \"Width\": 0.0,\r\n          \"Height\": 0.0,\r\n          \"Unit\": \"cm\"\r\n        },\r\n        \"ActualWeight\": {\r\n          \"Unit\": \"kg\",\r\n          \"Value\": 3.0\r\n        },\r\n        \"ChargeableWeight\": null,\r\n        \"DescriptionOfGoods\": \"Parcel\",\r\n        \"GoodsOriginCountry\": \"SA\",\r\n        \"NumberOfPieces\": 1,\r\n        \"ProductGroup\": \"DOM\",\r\n        \"ProductType\": \"CDS\",\r\n        \"PaymentType\": \"3\",\r\n        \"PaymentOptions\": null,\r\n        \"CustomsValueAmount\": null,\r\n        \"CashOnDeliveryAmount\": {\r\n          \"CurrencyCode\": \"\",\r\n          \"Value\": 0.0\r\n        },\r\n        \"InsuranceAmount\": {\r\n          \"CurrencyCode\": \"\",\r\n          \"Value\": 0.0\r\n        },\r\n        \"CashAdditionalAmount\": {\r\n          \"CurrencyCode\": \"\",\r\n          \"Value\": 0.0\r\n        },\r\n        \"CashAdditionalAmountDescription\": \"\",\r\n        \"CollectAmount\": {\r\n          \"CurrencyCode\": \"\",\r\n          \"Value\": 0.0\r\n        },\r\n        \"Services\": \"\",\r\n\r\n        \"DeliveryInstructions\": null,\r\n        \"AdditionalProperties\": null,\r\n        \"ContainsDangerousGoods\": false\r\n      },\r\n      \"Attachments\": null,\r\n      \"ForeignHAWB\": \"\",\r\n      \"TransportType \": 0,\r\n      \"PickupGUID\": \"\",\r\n      \"Number\": null,\r\n      \"ScheduledDelivery\": null\r\n    }\r\n  ],\r\n  \"LabelInfo\": {\r\n    \"ReportID\": 9201,\r\n    \"ReportType\": \"URL\"\r\n  },\r\n  \"ClientInfo\": {\r\n    \"UserName\": \"\",\r\n    \"Password\": \"\",\r\n    \"Version\": \"v1.0\",\r\n    \"AccountNumber\": \"\",\r\n    \"AccountPin\": \"\",\r\n    \"AccountEntity\": \"\",\r\n    \"AccountCountryCode\": \"SA\",\r\n    \"Source\": 0,\r\n    \"PreferredLanguageCode\": null\r\n  },\r\n  \"Transaction\": {\r\n    \"Reference1\": \"001\",\r\n    \"Reference2\": \"\",\r\n    \"Reference3\": \"\",\r\n    \"Reference4\": \"\",\r\n    \"Reference5\": \"\"\r\n  }\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CreateShipments",
+					"protocol": "https",
+					"host": [
+						"ws",
+						"aramex",
+						"net"
+					],
+					"path": [
+						"ShippingAPI.V2",
+						"Shipping",
+						"Service_1_0.svc",
+						"json",
+						"CreateShipments"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CreatePickup",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"Pickup\": {\r\n    \"PickupAddress\": {\r\n      \"Line1\": \"Address Line1\",\r\n      \"Line2\": \"\",\r\n      \"Line3\": \"\",\r\n      \"City\": \"Dammam\",\r\n      \"StateOrProvinceCode\": null,\r\n      \"PostCode\": null,\r\n      \"CountryCode\": \"SA\",\r\n      \"Longitude\": 0,\r\n      \"Latitude\": 0,\r\n      \"BuildingNumber\": null,\r\n      \"BuildingName\": null,\r\n      \"Floor\": null,\r\n      \"Apartment\": null,\r\n      \"POBox\": null,\r\n      \"Description\": null\r\n    },\r\n    \"PickupContact\": {\r\n      \"Department\": null,\r\n      \"PersonName\": \"Abdulaziz\",\r\n      \"Title\": null,\r\n      \"CompanyName\": \"Abdulaziz\",\r\n      \"PhoneNumber1\": \"966590446633\",\r\n      \"PhoneNumber1Ext\": null,\r\n      \"PhoneNumber2\": null,\r\n      \"PhoneNumber2Ext\": null,\r\n      \"FaxNumber\": null,\r\n      \"CellPhone\": \"966590446633\",\r\n      \"EmailAddress\": \"test@aramex.com\",\r\n      \"Type\": null\r\n    },\r\n    \"PickupLocation\": \"Dammam\",\r\n    \"PickupDate\": \"\\/Date(1668085200000)\\/\",\r\n    \"ReadyTime\": \"\\/Date(1668085200000)\\/\",\r\n    \"LastPickupTime\": \"\\/Date(1668092400000)\\/\",\r\n    \"ClosingTime\": \"\\/Date(1668092400000)\\/\",\r\n    \"Comments\": \"Pickup\",\r\n    \"Reference1\": \"Order0001\",\r\n    \"Reference2\": null,\r\n    \"Vehicle\": \"van\",\r\n    \"Shipments\": null,\r\n    \"PickupItems\": [\r\n      {\r\n        \"ProductGroup\": \"DOM\",\r\n        \"ProductType\": \"CDS\",\r\n        \"NumberOfShipments\": 1,\r\n        \"PackageType\": \"\",\r\n        \"Payment\": \"3\",\r\n        \"ShipmentWeight\": {\r\n          \"Unit\": \"KG\",\r\n          \"Value\": 3\r\n        },\r\n        \"ShipmentVolume\": {\r\n          \"Unit\": \"KG\",\r\n          \"Value\": 1\r\n        },\r\n        \"NumberOfPieces\": 1,\r\n        \"CashAmount\": {\r\n          \"CurrencyCode\": \"USD\",\r\n          \"Value\": 0\r\n        },\r\n        \"ExtraCharges\": {\r\n          \"CurrencyCode\": \"USD\",\r\n          \"Value\": 0\r\n        },\r\n        \"ShipmentDimensions\": {\r\n          \"Length\": 1,\r\n          \"Width\": 1,\r\n          \"Height\": 1,\r\n          \"Unit\": \"M\"\r\n        },\r\n        \"Comments\": \"\"\r\n      }\r\n    ],\r\n    \"Status\": \"Ready\",\r\n    \"ExistingShipments\": null,\r\n    \"Branch\": null,\r\n    \"RouteCode\": null,\r\n    \"Dispatcher\": 0\r\n  },\r\n  \"LabelInfo\": null,\r\n  \"ClientInfo\": {\r\n    \"UserName\": \"\",\r\n    \"Password\": \"!\",\r\n    \"Version\": \"v1.0\",\r\n    \"AccountNumber\": \"\",\r\n    \"AccountPin\": \"\",\r\n    \"AccountEntity\": \"DHA\",\r\n    \"AccountCountryCode\": \"SA\",\r\n    \"Source\": 0,\r\n    \"PreferredLanguageCode\": null\r\n  },\r\n  \"Transaction\": null\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CreatePickup",
+					"protocol": "https",
+					"host": [
+						"ws",
+						"aramex",
+						"net"
+					],
+					"path": [
+						"ShippingAPI.V2",
+						"Shipping",
+						"Service_1_0.svc",
+						"json",
+						"CreatePickup"
+					]
+				},
+				"description": "Create Pickup"
+			},
+			"response": []
+		},
+		{
+			"name": "TrackShipments",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n \"ClientInfo\": {\r\n    \"UserName\": \"\",\r\n    \"Password\": \"\",\r\n    \"Version\": \"v1.0\",\r\n    \"AccountNumber\": \"\",\r\n    \"AccountPin\": \"\",\r\n    \"AccountEntity\": \"\",\r\n    \"AccountCountryCode\": \"SA\",\r\n    \"Source\": 0,\r\n    \"PreferredLanguageCode\": null\r\n  },\r\n  \"GetLastTrackingUpdateOnly\": true,\r\n  \"Shipments\": [\r\n    \"47899103604\"\r\n  ],\r\n  \"Transaction\": {\r\n    \"Reference1\": \"\",\r\n    \"Reference2\": \"\",\r\n    \"Reference3\": \"\",\r\n    \"Reference4\": \"\",\r\n    \"Reference5\": \"\"\r\n  }\r\n}"
+				},
+				"url": {
+					"raw": "https://ws.aramex.net/ShippingAPI.V2/Tracking/Service_1_0.svc/json/TrackShipments",
+					"protocol": "https",
+					"host": [
+						"ws",
+						"aramex",
+						"net"
+					],
+					"path": [
+						"ShippingAPI.V2",
+						"Tracking",
+						"Service_1_0.svc",
+						"json",
+						"TrackShipments"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

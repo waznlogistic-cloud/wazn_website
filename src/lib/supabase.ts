@@ -8,13 +8,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
     url: !!supabaseUrl,
     key: !!supabaseAnonKey,
   })
-  // Don't throw in production - show error page instead
-  if (import.meta.env.DEV) {
-    throw new Error('Missing Supabase environment variables. Please check your .env file.')
-  }
+  // Don't throw - let the app load and show errors in UI instead
+  // This prevents white page issues
 }
 
 export const supabase = supabaseUrl && supabaseAnonKey 
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        // Use PKCE flow for better security and compatibility
+        flowType: 'pkce',
+      },
+    })
   : null as any
 
