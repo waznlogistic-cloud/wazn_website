@@ -80,19 +80,20 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
 }
 
 /**
- * Create a new order and optionally create Aramex shipment
+ * Create a new order with pending status
+ * Aramex shipment creation is deferred until payment_status becomes 'paid'
  */
 export async function createOrder(orderData: CreateOrderData): Promise<Order> {
   // Generate tracking number
   const trackingNo = `WAZN${Date.now().toString().slice(-8)}`;
 
-  // Create order in database first (single source of truth)
+  // Create order in database with pending status
   const { data, error } = await supabase
     .from("orders")
     .insert({
       ...orderData,
       tracking_no: trackingNo,
-      status: "new",
+      status: "pending",
       // Payment fields
       tap_charge_id: orderData.tap_charge_id,
       payment_status: orderData.payment_status || "pending",
@@ -104,49 +105,84 @@ export async function createOrder(orderData: CreateOrderData): Promise<Order> {
 
   if (error) throw error;
 
-  const order = data as Order;
+  return data as Order;
+}
 
-  // Try to create Aramex shipment if integration is enabled
+/**
+ * Process a paid order by creating Aramex shipment if applicable
+ * This function should be called when payment_status becomes 'paid'
+ */
+export async function processPaidOrder(orderId: string): Promise<Order | null> {
+  // Fetch the order
+  const order = await getOrderById(orderId);
+  if (!order) {
+    throw new Error(`Order ${orderId} not found`);
+  }
+
+  // Check if payment is paid
+  if (order.payment_status !== "paid") {
+    console.log(`Order ${orderId} payment_status is ${order.payment_status}, skipping Aramex shipment creation`);
+    return null;
+  }
+
+  // Check if Aramex shipment already exists
+  if (order.aramex_shipment_id || order.aramex_tracking_number) {
+    console.log(`Order ${orderId} already has Aramex shipment, skipping`);
+    return order;
+  }
+
+  // Check if Aramex integration is enabled and configured
   try {
     const { getIntegrationsConfig } = await import("@/config/integrations");
     const integrationsConfig = getIntegrationsConfig();
     
     // Validate all required Aramex fields are present
     if (
-      integrationsConfig.aramex.enabled &&
-      integrationsConfig.aramex.accountNumber &&
-      integrationsConfig.aramex.userName &&
-      integrationsConfig.aramex.password &&
-      integrationsConfig.aramex.accountPin &&
-      integrationsConfig.aramex.accountEntity &&
-      integrationsConfig.aramex.accountCountryCode
+      !integrationsConfig.aramex.enabled ||
+      !integrationsConfig.aramex.accountNumber ||
+      !integrationsConfig.aramex.userName ||
+      !integrationsConfig.aramex.password ||
+      !integrationsConfig.aramex.accountPin ||
+      !integrationsConfig.aramex.accountEntity ||
+      !integrationsConfig.aramex.accountCountryCode
     ) {
-      // createAramexShipment now returns the updated order
-      const updatedOrder = await createAramexShipment(order, orderData);
-      if (updatedOrder) {
-        return updatedOrder;
-      }
+      console.log(`Order ${orderId}: Aramex integration is disabled or not configured, skipping shipment creation`);
+      return order; // Return order without Aramex shipment
     }
+  } catch (configError: any) {
+    console.warn(`Order ${orderId}: Failed to check Aramex configuration:`, configError);
+    return order; // Return order without Aramex shipment if config check fails
+  }
+
+  // Prepare orderData from the order
+  const orderData: CreateOrderData = {
+    ship_type: order.ship_type,
+    sender_name: order.sender_name,
+    sender_phone: order.sender_phone,
+    sender_address: order.sender_address,
+    receiver_name: order.receiver_name,
+    receiver_phone: order.receiver_phone,
+    receiver_address: order.receiver_address,
+    weight: order.weight,
+    delivery_method: order.delivery_method,
+    delivery_at: order.delivery_at,
+    client_id: order.client_id,
+    employer_id: order.employer_id,
+    provider_id: order.provider_id,
+    tap_charge_id: order.tap_charge_id,
+    payment_status: order.payment_status,
+    payment_amount: order.payment_amount,
+    payment_currency: order.payment_currency,
+  };
+
+  // Create Aramex shipment
+  try {
+    return await createAramexShipment(order, orderData);
   } catch (aramexError: any) {
-    // Log error but don't fail order creation
-    console.error("Failed to create Aramex shipment:", aramexError);
-    // Optionally notify admin/staff about the failure
-    // For now, we'll just log it and let the order be created successfully
+    // Log error but don't fail - order is already created and paid
+    console.error(`Order ${orderId}: Failed to create Aramex shipment:`, aramexError);
+    return order; // Return order without Aramex shipment
   }
-
-  // Refetch order to ensure we have the latest data (in case of any async updates)
-  const { data: refreshedOrder, error: refreshError } = await supabase
-    .from("orders")
-    .select()
-    .eq("id", order.id)
-    .single();
-
-  if (refreshError) {
-    console.warn("Failed to refetch order after creation:", refreshError);
-    return order; // Return original order if refetch fails
-  }
-
-  return refreshedOrder as Order;
 }
 
 /**
@@ -343,11 +379,12 @@ async function createAramexShipment(order: Order, orderData: CreateOrderData): P
       console.warn("Could not extract delivery date from Aramex response:", e);
     }
 
-    // Update order with Aramex tracking information
+    // Update order with Aramex tracking information and change status to 'new'
     const updateData: any = {
       aramex_shipment_id: shipment.id,
       aramex_tracking_number: shipment.trackingNumber || shipment.id,
       aramex_label_url: shipment.labelUrl,
+      status: "new", // Change status from 'pending' to 'new' after shipment creation
     };
 
     // Add delivery date if available

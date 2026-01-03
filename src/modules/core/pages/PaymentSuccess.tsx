@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, Spin, Result, Button, message } from "antd";
 import { CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined } from "@ant-design/icons";
-import { createOrder } from "@/services/orders";
+import { createOrder, processPaidOrder } from "@/services/orders";
 import { useAuth } from "@/contexts/authContext";
 
 /**
@@ -69,7 +69,7 @@ export default function PaymentSuccess() {
         }
 
         // Create the order with payment information
-        const createdOrder = await createOrder({
+        let createdOrder = await createOrder({
           ...pendingOrderData,
           tap_charge_id: actualChargeId || pendingOrderData.tap_charge_id,
           payment_status: paymentStatus,
@@ -77,11 +77,27 @@ export default function PaymentSuccess() {
           payment_currency: "SAR",
         });
 
+        // If payment is paid, process the order (create Aramex shipment)
+        // Use the returned order from processPaidOrder to get updated status and tracking info
+        if (paymentStatus === "paid") {
+          try {
+            const processedOrder = await processPaidOrder(createdOrder.id);
+            // Use the processed order if available (has updated status and Aramex data)
+            if (processedOrder) {
+              createdOrder = processedOrder;
+            }
+          } catch (processError: any) {
+            // Log error but don't fail the flow - order is created, shipment can be retried
+            console.error("Failed to process paid order:", processError);
+            message.warning("تم إنشاء الطلب بنجاح، لكن فشل إنشاء الشحنة مع أرامكس. سيتم إعادة المحاولة تلقائياً.");
+          }
+        }
+
         // Clear session storage
         sessionStorage.removeItem("pendingOrderData");
         sessionStorage.removeItem("tapChargeId");
 
-        // Store order for confirmation page
+        // Store order for confirmation page (with updated status and tracking info)
         sessionStorage.setItem("createdOrder", JSON.stringify({
           ...createdOrder,
           trackingNumber: createdOrder.aramex_tracking_number || createdOrder.tracking_no,
