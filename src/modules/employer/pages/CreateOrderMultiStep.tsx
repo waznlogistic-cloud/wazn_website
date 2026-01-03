@@ -987,22 +987,20 @@ export default function CreateOrderMultiStep() {
       return;
     }
 
+    if (!selectedProvider) {
+      message.error("يرجى اختيار شركة الشحن");
+      return;
+    }
+
     try {
       setLoading(true);
       const values = form.getFieldsValue();
 
-      // Skip payment processing - create order directly
-      // Payment can be handled later or separately
       const { getIntegrationsConfig } = await import("@/config/integrations");
       const config = getIntegrationsConfig();
-      
-      let tapChargeId: string | undefined;
-      let paymentStatus: string = "pending";
 
-      // Delivery date will be calculated by Aramex based on service type and route
-      // We don't set it here - it will be determined by the shipping company
-
-      const createdOrder = await createOrder({
+      // Prepare order data to save to sessionStorage (will be used after payment)
+      const pendingOrderData = {
         employer_id: user.id,
         ship_type: orderData.shipmentType || "package",
         sender_name: values.senderName,
@@ -1013,26 +1011,102 @@ export default function CreateOrderMultiStep() {
         receiver_address: values.receiverAddress,
         weight: orderData.weight ? Number(orderData.weight) : undefined,
         delivery_method: orderData.deliveryMethod || "standard",
-        // delivery_at will be set by Aramex API response
-        price: selectedProvider?.price,
-        provider_id: selectedProvider?.id === "aramex" ? undefined : undefined, // TODO: Get actual provider ID
-        tap_charge_id: tapChargeId,
-        payment_status: paymentStatus,
-        payment_amount: selectedProvider?.price,
+        price: selectedProvider.price,
+        // provider_id: Set to UUID if selectedProvider.id is a UUID (internal provider),
+        // otherwise undefined for external services (aramex, mrsool, etc.)
+        // UUID format: 8-4-4-4-12 hexadecimal characters
+        provider_id: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedProvider.id)
+          ? selectedProvider.id
+          : undefined,
+        payment_amount: selectedProvider.price,
         payment_currency: config.tapPayments.currency || "SAR",
+      };
+
+      // Save order data to sessionStorage for use after payment
+      sessionStorage.setItem("pendingOrderData", JSON.stringify(pendingOrderData));
+
+      // Check if Tap Payments is configured
+      if (!config.tapPayments.enabled || !config.tapPayments.secretKey || !config.tapPayments.publicKey) {
+        throw new Error("Tap Payments is not configured. Please check your environment variables.");
+      }
+
+      // Import and ensure Tap Payments service is initialized
+      const { tapPaymentsService } = await import("@/services/tapPayments");
+      
+      // Initialize Tap Payments service if not already initialized
+      tapPaymentsService.initialize({
+        secretKey: config.tapPayments.secretKey,
+        publicKey: config.tapPayments.publicKey,
+        merchantId: config.tapPayments.merchantId,
+        apiUrl: config.tapPayments.apiUrl,
+        redirectUrl: config.tapPayments.redirectUrl || `${window.location.origin}/payment/success`,
+        webhookUrl: config.tapPayments.webhookUrl,
+        currency: config.tapPayments.currency || "SAR",
       });
 
-      // Store order data for confirmation page
-      sessionStorage.setItem("createdOrder", JSON.stringify({
-        ...createdOrder,
-        trackingNumber: createdOrder.aramex_tracking_number || createdOrder.tracking_no,
-      }));
+      // Get user profile for customer info
+      const { getProfile } = await import("@/services/profiles");
+      const profile = await getProfile(user.id);
 
-      setCurrentStep(3); // Go to confirmation step
-      message.success("تم إنشاء الطلب بنجاح!");
+      // Parse phone number (remove +966 if present, ensure it starts with 0)
+      let phoneNumber = user.phone || profile?.phone || values.senderPhone || "";
+      let countryCode = "+966";
+      
+      // Normalize phone number
+      if (phoneNumber.startsWith("+966")) {
+        phoneNumber = phoneNumber.replace("+966", "0");
+      } else if (phoneNumber.startsWith("966")) {
+        phoneNumber = phoneNumber.replace("966", "0");
+      }
+      
+      // Remove any non-digit characters except leading 0
+      phoneNumber = phoneNumber.replace(/\D/g, "");
+      if (!phoneNumber.startsWith("0")) {
+        phoneNumber = "0" + phoneNumber;
+      }
+
+      // Extract first and last name from user metadata or profile
+      const fullName = user.user_metadata?.full_name || profile?.full_name || values.senderName || "User";
+      const nameParts = fullName.split(" ");
+      const firstName = nameParts[0] || "User";
+      const lastName = nameParts.slice(1).join(" ") || "";
+
+      // Create Tap Payments charge
+      const chargeResponse = await tapPaymentsService.createCharge({
+        amount: selectedProvider.price,
+        currency: config.tapPayments.currency || "SAR",
+        customer: {
+          firstName: firstName,
+          lastName: lastName,
+          email: user.email || "",
+          phone: {
+            countryCode: countryCode,
+            number: phoneNumber.replace(/^0/, ""), // Remove leading 0 for Tap API
+          },
+        },
+        merchant: {
+          id: config.tapPayments.merchantId || "",
+        },
+        redirect: {
+          url: `${window.location.origin}/payment/success`,
+        },
+        description: `Order payment for ${selectedProvider.name} shipping`,
+        reference: {
+          order: `order_${Date.now()}`,
+        },
+      });
+
+      // Store Tap charge ID in sessionStorage
+      sessionStorage.setItem("tapChargeId", chargeResponse.id);
+
+      // Redirect to Tap Payments transaction URL
+      window.location.href = chargeResponse.transaction.url;
     } catch (error: any) {
-      console.error("Error creating order:", error);
-      message.error(error?.message || "فشل إنشاء الطلب");
+      console.error("Error creating payment:", error);
+      message.error(error?.message || "فشل إنشاء الدفع");
+      // Clear sessionStorage on error
+      sessionStorage.removeItem("pendingOrderData");
+      sessionStorage.removeItem("tapChargeId");
     } finally {
       setLoading(false);
     }
