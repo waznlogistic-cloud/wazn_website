@@ -80,6 +80,56 @@ export async function getOrderById(orderId: string): Promise<Order | null> {
 }
 
 /**
+ * Atomically claim the right to create a shipment for an order
+ * This prevents race conditions when multiple processes try to create shipments simultaneously
+ * Sets a temporary lock in the shipment fields to prevent concurrent execution
+ * Returns { success: true, lockValue: string } if claim succeeded, { success: false } if already claimed
+ */
+async function atomicallyClaimShipmentCreation(
+  orderId: string,
+  providerType: "aramex" | "mrsool"
+): Promise<{ success: boolean; lockValue?: string }> {
+  // Generate a unique lock value using timestamp and random string
+  const lockValue = `IN_PROGRESS_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  
+  // Use an atomic UPDATE that sets a temporary lock in the appropriate shipment field
+  // This prevents race conditions when both client-side and webhook try to create shipments
+  // The lock is set in the shipment_id field, which will be updated with the real value after external API call
+  const lockField = providerType === "aramex" ? "aramex_shipment_id" : "mrsool_order_id";
+  const trackingField = providerType === "aramex" ? "aramex_tracking_number" : "mrsool_tracking_number";
+  
+  const updateData: any = {
+    [lockField]: lockValue, // Set temporary lock
+    updated_at: new Date().toISOString(),
+  };
+  
+  const { data, error } = await supabase
+    .from("orders")
+    .update(updateData)
+    .eq("id", orderId)
+    .eq("payment_status", "paid") // Only process paid orders
+    .is("aramex_shipment_id", null) // Ensure Aramex shipment doesn't exist
+    .is("aramex_tracking_number", null)
+    .is("mrsool_order_id", null) // Ensure Mrsool shipment doesn't exist
+    .is("mrsool_tracking_number", null)
+    .select("id"); // Select to check if any rows were affected
+
+  if (error) {
+    console.warn(`Order ${orderId}: Failed to atomically claim shipment creation:`, error);
+    // On error, assume claim failed to be safe
+    return { success: false };
+  }
+
+  // If data is empty or null, another process already claimed it or shipment exists
+  // If data has items, we successfully claimed it
+  if (data !== null && data.length > 0) {
+    return { success: true, lockValue };
+  }
+  
+  return { success: false };
+}
+
+/**
  * Create a new order with pending status
  * Aramex shipment creation is deferred until payment_status becomes 'paid'
  */
@@ -125,9 +175,17 @@ export async function processPaidOrder(orderId: string): Promise<Order | null> {
     return null;
   }
 
-  // Check if Aramex shipment already exists
-  if (order.aramex_shipment_id || order.aramex_tracking_number) {
-    console.log(`Order ${orderId} already has Aramex shipment, skipping`);
+  // Check if shipment already exists (Aramex or Mrsool)
+  // Use atomic check-and-claim to prevent race conditions
+  const shipmentExists = 
+    order.aramex_shipment_id ||
+    order.aramex_tracking_number ||
+    order.mrsool_order_id ||
+    order.mrsool_tracking_number;
+
+  if (shipmentExists) {
+    const providerType = order.aramex_shipment_id || order.aramex_tracking_number ? "Aramex" : "Mrsool";
+    console.log(`Order ${orderId} already has ${providerType} shipment, skipping`);
     // Update status to 'new' if still pending (shipment already exists, so order is ready)
     if (order.status === "pending") {
       const { data: updatedOrder, error: statusUpdateError } = await supabase
@@ -151,55 +209,150 @@ export async function processPaidOrder(orderId: string): Promise<Order | null> {
     return order;
   }
 
-  // Check if Aramex integration is enabled and configured
-  let shouldCreateAramexShipment = false;
+  // Fetch provider to determine which shipment service to use
+  // This must happen BEFORE atomic claim to know which field to lock
+  let providerCompanyName = "";
+  if (order.provider_id) {
+    try {
+      const { data: provider, error: providerError } = await supabase
+        .from("providers")
+        .select("company_name")
+        .eq("id", order.provider_id)
+        .single();
+
+      if (providerError) {
+        console.warn(`Order ${orderId}: Failed to fetch provider:`, providerError);
+      } else if (provider) {
+        providerCompanyName = provider.company_name || "";
+      }
+    } catch (error) {
+      console.warn(`Order ${orderId}: Error fetching provider:`, error);
+    }
+  }
+
+  // Determine provider type (Aramex or Mrsool)
+  const providerCompanyNameUpper = providerCompanyName.toUpperCase();
+  const isAramex = providerCompanyNameUpper.includes("ARAMEX");
+  const isMrsool = providerCompanyNameUpper.includes("MRSOOL");
+  
+  // If no provider_id or provider not recognized, skip shipment creation
+  if (!order.provider_id || (!isAramex && !isMrsool)) {
+    console.log(`Order ${orderId}: No recognized provider (provider_id: ${order.provider_id}, company_name: ${providerCompanyName}), updating status to 'new'`);
+    // Update status to 'new' if still pending
+    if (order.status === "pending") {
+      const { data: updatedOrder, error: statusUpdateError } = await supabase
+        .from("orders")
+        .update({ status: "new" })
+        .eq("id", orderId)
+        .select()
+        .single();
+
+      if (statusUpdateError) {
+        console.error(`Order ${orderId}: Failed to update status to 'new':`, statusUpdateError);
+        const refreshedOrder = await getOrderById(orderId);
+        if (refreshedOrder) {
+          return refreshedOrder;
+        }
+        return order;
+      } else if (updatedOrder) {
+        return updatedOrder as Order;
+      }
+    }
+    return order;
+  }
+
+  // Check integration configuration based on provider type
+  // This must happen BEFORE atomic claim to avoid locking unnecessarily
+  let shouldCreateShipment = false;
   try {
     const { getIntegrationsConfig } = await import("@/config/integrations");
     const integrationsConfig = getIntegrationsConfig();
     
-    // Validate all required Aramex fields are present
-    if (
-      integrationsConfig.aramex.enabled &&
-      integrationsConfig.aramex.accountNumber &&
-      integrationsConfig.aramex.userName &&
-      integrationsConfig.aramex.password &&
-      integrationsConfig.aramex.accountPin &&
-      integrationsConfig.aramex.accountEntity &&
-      integrationsConfig.aramex.accountCountryCode
-    ) {
-      shouldCreateAramexShipment = true;
-    } else {
-      console.log(`Order ${orderId}: Aramex integration is disabled or not configured, skipping shipment creation`);
+    if (isAramex) {
+      // Validate all required Aramex fields are present
+      if (
+        integrationsConfig.aramex.enabled &&
+        integrationsConfig.aramex.accountNumber &&
+        integrationsConfig.aramex.userName &&
+        integrationsConfig.aramex.password &&
+        integrationsConfig.aramex.accountPin &&
+        integrationsConfig.aramex.accountEntity &&
+        integrationsConfig.aramex.accountCountryCode
+      ) {
+        shouldCreateShipment = true;
+      } else {
+        console.log(`Order ${orderId}: Aramex integration is disabled or not configured, skipping shipment creation`);
+      }
+    } else if (isMrsool) {
+      // Validate all required Mrsool fields are present
+      if (
+        integrationsConfig.mrsool.enabled &&
+        integrationsConfig.mrsool.apiKey
+      ) {
+        shouldCreateShipment = true;
+      } else {
+        console.log(`Order ${orderId}: Mrsool integration is disabled or not configured, skipping shipment creation`);
+      }
     }
   } catch (configError: any) {
-    console.warn(`Order ${orderId}: Failed to check Aramex configuration:`, configError);
+    console.warn(`Order ${orderId}: Failed to check integration configuration:`, configError);
   }
 
-  // If Aramex is not enabled/configured, update status to 'new' immediately
-  // If Aramex is enabled, status will be updated after successful shipment creation
-  if (!shouldCreateAramexShipment && order.status === "pending") {
-    const { data: updatedOrder, error: statusUpdateError } = await supabase
-      .from("orders")
-      .update({ status: "new" })
-      .eq("id", orderId)
-      .select()
-      .single();
+  // If integration is not enabled/configured for the selected provider, update status to 'new' immediately
+  // Return regardless of current status to prevent falling through to shipment creation
+  if (!shouldCreateShipment) {
+    // Only update status if it's still 'pending' (don't overwrite if already 'new' or other status)
+    if (order.status === "pending") {
+      const { data: updatedOrder, error: statusUpdateError } = await supabase
+        .from("orders")
+        .update({ status: "new" })
+        .eq("id", orderId)
+        .select()
+        .single();
 
-    if (statusUpdateError) {
-      console.error(`Order ${orderId}: Failed to update status to 'new':`, statusUpdateError);
-      // Refetch order to get current status (may have been updated by another process)
-      const refreshedOrder = await getOrderById(orderId);
-      if (refreshedOrder) {
-        return refreshedOrder;
+      if (statusUpdateError) {
+        console.error(`Order ${orderId}: Failed to update status to 'new':`, statusUpdateError);
+        const refreshedOrder = await getOrderById(orderId);
+        if (refreshedOrder) {
+          return refreshedOrder;
+        }
+        return order;
+      } else if (updatedOrder) {
+        order = updatedOrder as Order;
+        console.log(`Order ${orderId} status updated from 'pending' to 'new' (${isAramex ? 'Aramex' : isMrsool ? 'Mrsool' : 'Unknown'} integration not configured)`);
       }
-      // If refetch also fails, return original order (better than nothing)
-      return order;
-    } else if (updatedOrder) {
-      order = updatedOrder as Order;
-      console.log(`Order ${orderId} status updated from 'pending' to 'new' (Aramex not configured)`);
+    } else {
+      console.log(`Order ${orderId}: Integration not configured, skipping shipment creation (status: ${order.status})`);
     }
     return order;
   }
+
+  // Atomically claim the right to create shipment by setting a lock in the shipment field
+  // This prevents race conditions when both client-side and webhook try to create shipments
+  // The lock is set BEFORE external API calls to prevent duplicate shipments
+  const providerType = isAramex ? "aramex" : "mrsool";
+  const claimResult = await atomicallyClaimShipmentCreation(orderId, providerType);
+  if (!claimResult.success) {
+    // Another process already claimed it or shipment was created, refetch order
+    console.log(`Order ${orderId}: Shipment creation already claimed by another process, refetching order`);
+    const refreshedOrder = await getOrderById(orderId);
+    if (refreshedOrder) {
+      // Check if shipment was created
+      if (
+        refreshedOrder.aramex_shipment_id ||
+        refreshedOrder.aramex_tracking_number ||
+        refreshedOrder.mrsool_order_id ||
+        refreshedOrder.mrsool_tracking_number
+      ) {
+        return refreshedOrder;
+      }
+    }
+    // If we can't refetch or shipment wasn't created, return original order
+    return order;
+  }
+  
+  // Store the lock value to verify we still own the lock when updating
+  const lockValue = claimResult.lockValue!;
 
   // Prepare orderData from the order
   const orderData: CreateOrderData = {
@@ -222,14 +375,49 @@ export async function processPaidOrder(orderId: string): Promise<Order | null> {
     payment_currency: order.payment_currency,
   };
 
-  // Create Aramex shipment
-  // Status will be updated to 'new' inside createAramexShipment on success
+  // Route to appropriate shipment creation function based on provider
+  // Pass lockValue to verify we still own the lock when updating
   try {
-    return await createAramexShipment(order, orderData);
-  } catch (aramexError: any) {
+    if (isAramex) {
+      // Create Aramex shipment
+      // Status will be updated to 'new' inside createAramexShipment on success
+      return await createAramexShipment(order, orderData, lockValue);
+    } else if (isMrsool) {
+      // Create Mrsool shipment
+      // Status will be updated to 'new' inside createMrsoolShipment on success
+      return await createMrsoolShipment(order, orderData, lockValue);
+    } else {
+      // Should not reach here due to check above, but handle gracefully
+      console.warn(`Order ${orderId}: Unknown provider type, updating status to 'new'`);
+      if (order.status === "pending") {
+        const { data: updatedOrder } = await supabase
+          .from("orders")
+          .update({ status: "new" })
+          .eq("id", orderId)
+          .select()
+          .single();
+        if (updatedOrder) {
+          return updatedOrder as Order;
+        }
+      }
+      return order;
+    }
+  } catch (shipmentError: any) {
     // Log error but don't fail - order is already created and paid
+    // Release the lock by clearing the temporary lock value
+    try {
+      const lockField = providerType === "aramex" ? "aramex_shipment_id" : "mrsool_order_id";
+      await supabase
+        .from("orders")
+        .update({ [lockField]: null })
+        .eq("id", orderId)
+        .eq(lockField, lockValue); // Only clear if we still own the lock
+    } catch (lockReleaseError) {
+      console.warn(`Order ${orderId}: Failed to release shipment creation lock:`, lockReleaseError);
+    }
+    
     // Don't update status to 'new' if shipment creation failed - keep it as 'pending' for retry
-    console.error(`Order ${orderId}: Failed to create Aramex shipment:`, aramexError);
+    console.error(`Order ${orderId}: Failed to create shipment (${isAramex ? 'Aramex' : isMrsool ? 'Mrsool' : 'Unknown'}):`, shipmentError);
     // Return order with original status (still 'pending') so it can be retried
     return order;
   }
@@ -239,7 +427,11 @@ export async function processPaidOrder(orderId: string): Promise<Order | null> {
  * Create Aramex shipment for an order
  * Returns the updated order with Aramex fields, or null if update failed
  */
-async function createAramexShipment(order: Order, orderData: CreateOrderData): Promise<Order | null> {
+async function createAramexShipment(
+  order: Order,
+  orderData: CreateOrderData,
+  lockValue: string
+): Promise<Order | null> {
   // Dynamically import all Aramex-related modules to avoid loading them if not needed
   const [
     { aramexService },
@@ -468,16 +660,44 @@ async function createAramexShipment(order: Order, orderData: CreateOrderData): P
       updateData.delivery_at = deliveryDate;
     }
 
+    // Update order with real shipment data, but only if we still own the lock
+    // This ensures we don't overwrite if another process already created the shipment
     const { data: updatedOrder, error: updateError } = await supabase
       .from("orders")
       .update(updateData)
       .eq("id", order.id)
+      .eq("aramex_shipment_id", lockValue) // Only update if we still own the lock
       .select()
       .single();
 
     if (updateError) {
       console.error("Failed to update order with Aramex data:", updateError);
+      // Release the lock on update failure
+      try {
+        await supabase
+          .from("orders")
+          .update({ aramex_shipment_id: null })
+          .eq("id", order.id)
+          .eq("aramex_shipment_id", lockValue);
+      } catch (lockReleaseError) {
+        console.warn(`Order ${order.id}: Failed to release shipment creation lock:`, lockReleaseError);
+      }
       throw updateError;
+    }
+
+    if (!updatedOrder) {
+      // Update didn't affect any rows - another process may have created shipment
+      // Release the lock
+      try {
+        await supabase
+          .from("orders")
+          .update({ aramex_shipment_id: null })
+          .eq("id", order.id)
+          .eq("aramex_shipment_id", lockValue);
+      } catch (lockReleaseError) {
+        console.warn(`Order ${order.id}: Failed to release shipment creation lock:`, lockReleaseError);
+      }
+      throw new Error("Failed to update order with Aramex shipment data - another process may have created shipment");
     }
 
     console.log("Aramex shipment created successfully:", {
@@ -489,7 +709,226 @@ async function createAramexShipment(order: Order, orderData: CreateOrderData): P
     // Return the updated order data
     return updatedOrder as Order;
   } else {
+    // No shipments returned - release the lock
+    try {
+      await supabase
+        .from("orders")
+        .update({ aramex_shipment_id: null })
+        .eq("id", order.id)
+        .eq("aramex_shipment_id", lockValue);
+    } catch (lockReleaseError) {
+      console.warn(`Order ${order.id}: Failed to release shipment creation lock:`, lockReleaseError);
+    }
     throw new Error("Aramex API returned no shipments");
+  }
+}
+
+/**
+ * Geocode an address to get latitude and longitude
+ * Uses Nominatim (OpenStreetMap) geocoding service
+ */
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    // Use Nominatim geocoding API (free, no API key required)
+    const encodedAddress = encodeURIComponent(address);
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1`,
+      {
+        headers: {
+          "User-Agent": "Wazn Platform", // Required by Nominatim
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`Geocoding failed for address: ${address}`);
+      return null;
+    }
+
+    const data = await response.json();
+    if (data && data.length > 0) {
+      return {
+        lat: parseFloat(data[0].lat),
+        lng: parseFloat(data[0].lon),
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.warn(`Geocoding error for address: ${address}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Create Mrsool shipment for an order
+ * Returns the updated order with Mrsool fields, or null if update failed
+ */
+async function createMrsoolShipment(
+  order: Order,
+  orderData: CreateOrderData,
+  lockValue: string
+): Promise<Order | null> {
+  try {
+    // Dynamically import Mrsool service
+    const [{ mrsoolService }, { getIntegrationsConfig }] = await Promise.all([
+      import("@/services/mrsool"),
+      import("@/config/integrations"),
+    ]);
+
+    const integrationsConfig = getIntegrationsConfig();
+
+    // Ensure Mrsool service is initialized
+    if (!mrsoolService.isInitialized()) {
+      if (
+        integrationsConfig.mrsool.enabled &&
+        integrationsConfig.mrsool.apiKey
+      ) {
+        mrsoolService.initialize({
+          apiKey: integrationsConfig.mrsool.apiKey,
+          apiUrl: integrationsConfig.mrsool.apiUrl,
+        });
+      } else {
+        throw new Error("Mrsool integration is enabled but configuration is incomplete.");
+      }
+    }
+
+    // Validate that addresses are provided
+    if (!orderData.sender_address || orderData.sender_address.trim() === "") {
+      throw new Error("Sender address is required for Mrsool shipment.");
+    }
+    if (!orderData.receiver_address || orderData.receiver_address.trim() === "") {
+      throw new Error("Receiver address is required for Mrsool shipment.");
+    }
+
+    // Geocode addresses to get coordinates
+    const senderCoords = await geocodeAddress(orderData.sender_address);
+    const receiverCoords = await geocodeAddress(orderData.receiver_address);
+
+    if (!senderCoords) {
+      throw new Error(`Failed to geocode sender address: ${orderData.sender_address}`);
+    }
+    if (!receiverCoords) {
+      throw new Error(`Failed to geocode receiver address: ${orderData.receiver_address}`);
+    }
+
+    // Extract city from addresses (simple parsing - use first part after comma or whole address)
+    const parseCity = (address: string): string => {
+      const parts = address.split(",").map((p) => p.trim());
+      // If address has multiple parts, city is usually the second-to-last or last
+      if (parts.length >= 2) {
+        return parts[parts.length - 1]; // Last part is often city
+      }
+      return parts[0] || "";
+    };
+
+    const senderCity = parseCity(orderData.sender_address);
+    const receiverCity = parseCity(orderData.receiver_address);
+
+    // Create Mrsool order
+    const mrsoolResponse = await mrsoolService.createOrder({
+      pickup: {
+        latitude: senderCoords.lat,
+        longitude: senderCoords.lng,
+        address: orderData.sender_address,
+        city: senderCity,
+        contactName: orderData.sender_name || "",
+        contactPhone: orderData.sender_phone || "",
+      },
+      delivery: {
+        latitude: receiverCoords.lat,
+        longitude: receiverCoords.lng,
+        address: orderData.receiver_address,
+        city: receiverCity,
+        contactName: orderData.receiver_name || "",
+        contactPhone: orderData.receiver_phone || "",
+      },
+      weight: orderData.weight,
+      description: orderData.ship_type || "Parcel",
+      reference: order.id,
+    });
+
+    // Validate that the API response contains valid shipment IDs
+    // The mrsoolService.createOrder() returns empty strings as defaults if API doesn't provide these fields
+    // We must not save empty strings to the database as it makes orders appear to have shipments when they don't
+    if (!mrsoolResponse.orderId || mrsoolResponse.orderId.trim() === "") {
+      throw new Error("Mrsool API did not return a valid order ID");
+    }
+    if (!mrsoolResponse.trackingNumber || mrsoolResponse.trackingNumber.trim() === "") {
+      throw new Error("Mrsool API did not return a valid tracking number");
+    }
+
+    // Update order with Mrsool tracking information and status
+    // Use atomic UPDATE with WHERE conditions to prevent overwriting if another process already created shipment
+    const updateData: any = {
+      status: "new", // Update status to 'new' after successful shipment creation
+      mrsool_order_id: mrsoolResponse.orderId,
+      mrsool_tracking_number: mrsoolResponse.trackingNumber,
+    };
+
+    if (mrsoolResponse.estimatedDeliveryTime) {
+      updateData.delivery_at = mrsoolResponse.estimatedDeliveryTime;
+    }
+
+    // Update order with real shipment data, but only if we still own the lock
+    // This ensures we don't overwrite if another process already created the shipment
+    const { data: updatedOrder, error: updateError } = await supabase
+      .from("orders")
+      .update(updateData)
+      .eq("id", order.id)
+      .eq("mrsool_order_id", lockValue) // Only update if we still own the lock
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error(`Order ${order.id}: Failed to update order with Mrsool data:`, updateError);
+      // Release the lock on update failure
+      try {
+        await supabase
+          .from("orders")
+          .update({ mrsool_order_id: null })
+          .eq("id", order.id)
+          .eq("mrsool_order_id", lockValue);
+      } catch (lockReleaseError) {
+        console.warn(`Order ${order.id}: Failed to release shipment creation lock:`, lockReleaseError);
+      }
+      throw new Error(`Failed to update order: ${updateError.message}`);
+    }
+
+    if (!updatedOrder) {
+      // Update didn't affect any rows - another process may have created shipment
+      // Release the lock
+      try {
+        await supabase
+          .from("orders")
+          .update({ mrsool_order_id: null })
+          .eq("id", order.id)
+          .eq("mrsool_order_id", lockValue);
+      } catch (lockReleaseError) {
+        console.warn(`Order ${order.id}: Failed to release shipment creation lock:`, lockReleaseError);
+      }
+      throw new Error("Failed to update order with Mrsool shipment data - another process may have created shipment");
+    }
+
+    console.log(`Order ${order.id}: Mrsool shipment created successfully`, {
+      orderId: mrsoolResponse.orderId,
+      trackingNumber: mrsoolResponse.trackingNumber,
+    });
+
+    return updatedOrder as Order;
+  } catch (error: any) {
+    // Release the lock on any error (including validation errors for empty orderId/trackingNumber)
+    try {
+      await supabase
+        .from("orders")
+        .update({ mrsool_order_id: null })
+        .eq("id", order.id)
+        .eq("mrsool_order_id", lockValue);
+    } catch (lockReleaseError) {
+      console.warn(`Order ${order.id}: Failed to release shipment creation lock:`, lockReleaseError);
+    }
+    // Re-throw the error so it can be handled by the caller
+    throw error;
   }
 }
 

@@ -77,19 +77,19 @@ export default function PaymentSuccess() {
           payment_currency: "SAR",
         });
 
-        // If payment is paid, process the order (create Aramex shipment)
+        // If payment is paid, process the order (create shipment - Aramex or Mrsool)
         // Use the returned order from processPaidOrder to get updated status and tracking info
         if (paymentStatus === "paid") {
           try {
             const processedOrder = await processPaidOrder(createdOrder.id);
-            // Use the processed order if available (has updated status and Aramex data)
+            // Use the processed order if available (has updated status and shipment tracking data)
             if (processedOrder) {
               createdOrder = processedOrder;
             }
           } catch (processError: any) {
             // Log error but don't fail the flow - order is created, shipment can be retried
             console.error("Failed to process paid order:", processError);
-            message.warning("تم إنشاء الطلب بنجاح، لكن فشل إنشاء الشحنة مع أرامكس. سيتم إعادة المحاولة تلقائياً.");
+            message.warning("تم إنشاء الطلب بنجاح، لكن فشل إنشاء الشحنة. سيتم إعادة المحاولة تلقائياً.");
           }
         }
 
@@ -98,9 +98,10 @@ export default function PaymentSuccess() {
         sessionStorage.removeItem("tapChargeId");
 
         // Store order for confirmation page (with updated status and tracking info)
+        // Check for both Aramex and Mrsool tracking numbers before falling back to base tracking_no
         sessionStorage.setItem("createdOrder", JSON.stringify({
           ...createdOrder,
-          trackingNumber: createdOrder.aramex_tracking_number || createdOrder.tracking_no,
+          trackingNumber: createdOrder.aramex_tracking_number || createdOrder.mrsool_tracking_number || createdOrder.tracking_no,
         }));
 
         setOrderId(createdOrder.id);

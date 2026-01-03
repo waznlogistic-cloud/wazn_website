@@ -38,6 +38,10 @@ export type Order = {
   aramex_shipment_id?: string;
   aramex_tracking_number?: string;
   aramex_label_url?: string;
+  // Mrsool integration fields
+  mrsool_order_id?: string;
+  mrsool_tracking_number?: string;
+  mrsool_label_url?: string;
   // Payment integration fields
   payment_status?: string;
   tap_charge_id?: string;

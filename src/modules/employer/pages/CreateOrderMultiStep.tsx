@@ -37,11 +37,13 @@ export default function CreateOrderMultiStep() {
   const [senderLocation, setSenderLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [receiverLocation, setReceiverLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [providerMapping, setProviderMapping] = useState<Record<string, string>>({}); // Maps service ID to provider UUID
+  const [providerMappingError, setProviderMappingError] = useState<string | null>(null); // Track provider mapping errors
 
   // Fetch provider records from database to map external services to provider UUIDs
   useEffect(() => {
     const fetchProviders = async () => {
       try {
+        setProviderMappingError(null);
         // Fetch providers that match external service names (case-insensitive)
         const { data: providers, error } = await supabase
           .from("providers")
@@ -49,7 +51,9 @@ export default function CreateOrderMultiStep() {
           .or("company_name.ilike.%Aramex%,company_name.ilike.%Mrsool%");
 
         if (error) {
-          console.warn("Failed to fetch providers:", error);
+          console.error("Failed to fetch providers:", error);
+          setProviderMappingError("فشل تحميل بيانات شركات الشحن. يرجى المحاولة مرة أخرى.");
+          message.error("فشل تحميل بيانات شركات الشحن. يرجى تحديث الصفحة والمحاولة مرة أخرى.");
           return;
         }
 
@@ -66,8 +70,16 @@ export default function CreateOrderMultiStep() {
           }
         }
         setProviderMapping(mapping);
+        
+        // Warn if no providers found
+        if (Object.keys(mapping).length === 0) {
+          console.warn("No Aramex or Mrsool providers found in database");
+          setProviderMappingError("لم يتم العثور على شركات الشحن في قاعدة البيانات. يرجى التأكد من إعداد الشركات أولاً.");
+        }
       } catch (error) {
-        console.warn("Error fetching providers:", error);
+        console.error("Error fetching providers:", error);
+        setProviderMappingError("حدث خطأ أثناء تحميل بيانات شركات الشحن. يرجى المحاولة مرة أخرى.");
+        message.error("حدث خطأ أثناء تحميل بيانات شركات الشحن. يرجى تحديث الصفحة والمحاولة مرة أخرى.");
       }
     };
 
@@ -1058,7 +1070,15 @@ export default function CreateOrderMultiStep() {
             return selectedProvider.id;
           }
           // Otherwise, look up in provider mapping
-          return providerMapping[selectedProvider.id.toLowerCase()] || undefined;
+          const mappedProviderId = providerMapping[selectedProvider.id.toLowerCase()];
+          if (!mappedProviderId) {
+            // Provider mapping failed - show error and prevent order creation
+            const errorMsg = providerMappingError || 
+              `فشل العثور على معرف شركة الشحن المحددة (${selectedProvider.id}). يرجى تحديث الصفحة والمحاولة مرة أخرى.`;
+            message.error(errorMsg);
+            throw new Error(`Provider mapping failed for ${selectedProvider.id}`);
+          }
+          return mappedProviderId;
         })(),
         payment_amount: selectedProvider.price,
         payment_currency: config.tapPayments.currency || "SAR",
