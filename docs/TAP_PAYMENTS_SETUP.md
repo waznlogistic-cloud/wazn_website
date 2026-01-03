@@ -58,71 +58,61 @@ VITE_TAP_WEBHOOK_URL=https://your-domain.com/api/tap/webhook
 
 ## 📡 Webhook Handler
 
-**Important:** Webhooks require a backend API endpoint. Since this is a frontend-only React app, you have two options:
+**✅ Implemented:** A Supabase Edge Function has been created to handle Tap Payments webhooks.
 
-### Option 1: Supabase Edge Function (Recommended)
+### Location
 
-Create a Supabase Edge Function to handle webhooks:
+The webhook handler is located at:
+- **Function**: `supabase/functions/tap-webhook/index.ts`
+- **Documentation**: `supabase/functions/tap-webhook/README.md`
 
-1. Create `supabase/functions/tap-webhook/index.ts`:
+### Features
 
-```typescript
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+The webhook handler automatically:
+1. ✅ Listens for CAPTURED payment status from Tap Payments
+2. ✅ Finds the order by `tap_charge_id`
+3. ✅ Updates order `payment_status` to 'paid'
+4. ✅ Triggers Aramex shipment creation automatically
+5. ✅ Updates order with tracking information
+6. ✅ Handles errors gracefully (order is paid even if shipment fails)
 
-serve(async (req) => {
-  try {
-    const payload = await req.json();
-    
-    // Verify webhook signature (if Tap provides one)
-    // TODO: Implement signature verification
-    
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-    
-    // Extract order ID from reference
-    const orderId = payload.data?.object?.reference?.order;
-    const chargeId = payload.data?.object?.id;
-    const status = payload.data?.object?.status;
-    
-    if (orderId && chargeId) {
-      // Update order payment status
-      const paymentStatus = status === "CAPTURED" ? "paid" : 
-                           status === "FAILED" || status === "DECLINED" ? "failed" : 
-                           "pending";
-      
-      await supabase
-        .from("orders")
-        .update({
-          payment_status: paymentStatus,
-          tap_charge_id: chargeId,
-          paid_at: status === "CAPTURED" ? new Date().toISOString() : null,
-        })
-        .eq("tap_charge_id", chargeId);
-    }
-    
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-});
-```
+### Deployment
 
-2. Deploy the function:
-```bash
-supabase functions deploy tap-webhook
-```
+See `supabase/functions/tap-webhook/README.md` for detailed deployment instructions.
 
-3. Update webhook URL in Tap Payments dashboard:
-   - Go to Tap Payments dashboard
-   - Set webhook URL to: `https://your-project.supabase.co/functions/v1/tap-webhook`
+**Quick Deploy:**
+
+1. **Install Supabase CLI:**
+   ```bash
+   npm install -g supabase
+   ```
+
+2. **Login and Link:**
+   ```bash
+   supabase login
+   supabase link --project-ref your-project-ref
+   ```
+
+3. **Set Secrets:**
+   ```bash
+   supabase secrets set ARAMEX_ENABLED=true
+   supabase secrets set ARAMEX_ACCOUNT_NUMBER=your_account_number
+   supabase secrets set ARAMEX_USERNAME=your_username
+   supabase secrets set ARAMEX_PASSWORD=your_password
+   supabase secrets set ARAMEX_ACCOUNT_PIN=your_pin
+   supabase secrets set ARAMEX_ACCOUNT_ENTITY=your_entity
+   supabase secrets set ARAMEX_ACCOUNT_COUNTRY_CODE=SA
+   ```
+
+4. **Deploy:**
+   ```bash
+   supabase functions deploy tap-webhook
+   ```
+
+5. **Configure in Tap Payments Dashboard:**
+   - Go to Settings → Webhooks
+   - Add webhook URL: `https://your-project-ref.supabase.co/functions/v1/tap-webhook`
+   - Select events: "Charge Captured" or "All Events"
 
 ### Option 2: Separate Backend API
 
@@ -197,11 +187,12 @@ app.post('/api/tap/webhook', async (req, res) => {
 ## 📝 Next Steps
 
 1. ✅ **Payment Success Page** - Created
-2. ⏳ **Webhook Handler** - Create Supabase Edge Function
-3. ⏳ **Test End-to-End** - Complete test payment flow
-4. ⏳ **Production Setup** - Configure production URLs
-5. ⏳ **Error Handling** - Add retry logic for failed payments
-6. ⏳ **Payment History** - Show payment status in orders list
+2. ✅ **Webhook Handler** - Supabase Edge Function created
+3. ⏳ **Deploy Webhook** - Deploy Edge Function and configure in Tap Payments
+4. ⏳ **Test End-to-End** - Complete test payment flow with webhook
+5. ⏳ **Production Setup** - Configure production URLs and secrets
+6. ⏳ **Error Handling** - Add retry logic for failed shipments
+7. ⏳ **Payment History** - Show payment status in orders list
 
 ## 🔐 Security Notes
 

@@ -121,8 +121,27 @@ export async function processPaidOrder(orderId: string): Promise<Order | null> {
 
   // Check if payment is paid
   if (order.payment_status !== "paid") {
-    console.log(`Order ${orderId} payment_status is ${order.payment_status}, skipping Aramex shipment creation`);
+    console.log(`Order ${orderId} payment_status is ${order.payment_status}, skipping processing`);
     return null;
+  }
+
+  // Update order status from 'pending' to 'new' when payment is confirmed
+  // This should happen regardless of Aramex shipment creation success/failure
+  if (order.status === "pending") {
+    const { data: updatedOrder, error: statusUpdateError } = await supabase
+      .from("orders")
+      .update({ status: "new" })
+      .eq("id", orderId)
+      .select()
+      .single();
+
+    if (statusUpdateError) {
+      console.error(`Order ${orderId}: Failed to update status to 'new':`, statusUpdateError);
+      // Continue processing even if status update fails
+    } else if (updatedOrder) {
+      order = updatedOrder as Order;
+      console.log(`Order ${orderId} status updated from 'pending' to 'new'`);
+    }
   }
 
   // Check if Aramex shipment already exists
@@ -299,11 +318,37 @@ async function createAramexShipment(order: Order, orderData: CreateOrderData): P
   // Get operations instructions (for fragile/heavy)
   const operationsInstructions = getOperationsInstructions(orderData.ship_type);
 
+  // Fetch employer email from session or profile
+  let shipperEmail = "";
+  try {
+    // First, try to get email from current session
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user && orderData.employer_id === session.user.id) {
+      shipperEmail = session.user.email || "";
+    }
+    
+    // If no email from session or employer_id doesn't match, fetch from profile
+    if (!shipperEmail && orderData.employer_id) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("id", orderData.employer_id)
+        .single();
+      
+      if (profile?.email) {
+        shipperEmail = profile.email;
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to fetch employer email for Aramex shipment:", error);
+    // Continue with empty email if fetch fails
+  }
+
   // Prepare Aramex shipment request
   const aramexRequest = {
     shipper: {
       name: orderData.sender_name,
-      email: "", // Not provided in form, could be fetched from employer profile
+      email: shipperEmail,
       phone: orderData.sender_phone,
       cellPhone: orderData.sender_phone,
       line1: senderAddress.line1,

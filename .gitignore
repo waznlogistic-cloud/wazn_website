@@ -27,10 +27,10 @@ dist-ssr
 .env
 .env.local
 .env.production
-.env.*.local
 .env.development
 .env.test
 .env.staging
+.env.*.local
 
 # Sensitive credential files (extra protection)
 *.key
@@ -39,3 +39,6 @@ dist-ssr
 secrets.json
 credentials.json
 config.local.json
+
+# Supabase
+.supabase

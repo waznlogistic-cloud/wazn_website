@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { Form, Input, DatePicker, Select, Button, Card, Space, Steps, Spin, Tooltip, App } from "antd";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CheckCircleOutlined, CreditCardOutlined, InfoCircleOutlined } from "@ant-design/icons";
-import { createOrder } from "@/services/orders";
 import { useAuth } from "@/contexts/authContext";
+import { supabase } from "@/lib/supabase";
 import AddressPicker from "@/modules/core/components/AddressPicker";
 import aramexLogo from "@/assets/aramex.svg";
 import mrsoolLogo from "@/assets/marsool.svg";
@@ -36,6 +36,43 @@ export default function CreateOrderMultiStep() {
   const [rateCalculationDetails, setRateCalculationDetails] = useState<any>(null); // Store rate calculation details
   const [senderLocation, setSenderLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [receiverLocation, setReceiverLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [providerMapping, setProviderMapping] = useState<Record<string, string>>({}); // Maps service ID to provider UUID
+
+  // Fetch provider records from database to map external services to provider UUIDs
+  useEffect(() => {
+    const fetchProviders = async () => {
+      try {
+        // Fetch providers that match external service names (case-insensitive)
+        const { data: providers, error } = await supabase
+          .from("providers")
+          .select("id, company_name")
+          .or("company_name.ilike.%Aramex%,company_name.ilike.%Mrsool%");
+
+        if (error) {
+          console.warn("Failed to fetch providers:", error);
+          return;
+        }
+
+        // Create mapping from service identifier to provider UUID
+        const mapping: Record<string, string> = {};
+        if (providers) {
+          for (const provider of providers) {
+            const companyNameUpper = provider.company_name.toUpperCase();
+            if (companyNameUpper.includes("ARAMEX")) {
+              mapping["aramex"] = provider.id;
+            } else if (companyNameUpper.includes("MRSOOL")) {
+              mapping["mrsool"] = provider.id;
+            }
+          }
+        }
+        setProviderMapping(mapping);
+      } catch (error) {
+        console.warn("Error fetching providers:", error);
+      }
+    };
+
+    fetchProviders();
+  }, []);
 
   // Check URL parameter for step (used when redirecting from payment success)
   useEffect(() => {
@@ -1012,12 +1049,17 @@ export default function CreateOrderMultiStep() {
         weight: orderData.weight ? Number(orderData.weight) : undefined,
         delivery_method: orderData.deliveryMethod || "standard",
         price: selectedProvider.price,
-        // provider_id: Set to UUID if selectedProvider.id is a UUID (internal provider),
-        // otherwise undefined for external services (aramex, mrsool, etc.)
-        // UUID format: 8-4-4-4-12 hexadecimal characters
-        provider_id: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedProvider.id)
-          ? selectedProvider.id
-          : undefined,
+        // provider_id: Map to actual provider UUID from database
+        // If selectedProvider.id is a UUID (internal provider), use it directly
+        // If it's an external service identifier (aramex, mrsool), look up the provider UUID
+        provider_id: (() => {
+          // Check if it's already a UUID
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedProvider.id)) {
+            return selectedProvider.id;
+          }
+          // Otherwise, look up in provider mapping
+          return providerMapping[selectedProvider.id.toLowerCase()] || undefined;
+        })(),
         payment_amount: selectedProvider.price,
         payment_currency: config.tapPayments.currency || "SAR",
       };
