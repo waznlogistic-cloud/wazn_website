@@ -164,8 +164,24 @@ serve(async (req) => {
 
     console.log(`Order ${order.id} payment status updated to 'paid'`);
 
-    // Process paid order (create Aramex shipment if applicable)
-    await processPaidOrder(supabase, order);
+    // Refetch order to get latest data (including any Aramex shipment created by client-side)
+    const { data: refreshedOrder, error: refetchError } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", order.id)
+      .single();
+
+    if (refetchError) {
+      console.error("Error refetching order:", refetchError);
+      throw refetchError;
+    }
+
+    if (!refreshedOrder) {
+      throw new Error(`Order ${order.id} not found after payment update`);
+    }
+
+    // Process paid order (create Aramex shipment if applicable) with refreshed order data
+    await processPaidOrder(supabase, refreshedOrder as Order);
 
     return new Response(
       JSON.stringify({
@@ -389,6 +405,7 @@ async function createAramexShipment(
     
     // Extract country code from last part
     let countryCode = "SA"; // Default fallback
+    let countryFoundInLastPart = false;
     if (parts.length > 0) {
       const lastPart = parts[parts.length - 1].trim();
       const lastPartUpper = lastPart.toUpperCase();
@@ -399,13 +416,14 @@ async function createAramexShipment(
         for (const [countryName, code] of Object.entries(COUNTRY_CODE_MAPPINGS)) {
           if (code === lastPartUpper) {
             countryCode = code;
+            countryFoundInLastPart = true;
             break;
           }
         }
       }
       
       // If not found as code, try to match as country name
-      if (countryCode === "SA" && lastPartUpper !== "SA") {
+      if (!countryFoundInLastPart && lastPartUpper !== "SA") {
         for (const [countryName, code] of Object.entries(COUNTRY_CODE_MAPPINGS)) {
           const countryNameUpper = countryName.toUpperCase();
           if (
@@ -413,16 +431,39 @@ async function createAramexShipment(
             lastPart === countryName
           ) {
             countryCode = code;
+            countryFoundInLastPart = true;
             break;
           }
         }
       }
     }
     
+    // Extract city correctly based on address format
+    // Common formats:
+    // - "Street, City" (2 parts, no country) -> city is parts[1]
+    // - "Street, City, Country" (3 parts) -> city is parts[1] (second-to-last)
+    // - "Street, District, City" (3 parts, no country) -> city is parts[2] (last)
+    // - "Street, District, City, Country" (4 parts) -> city is parts[2] (second-to-last)
+    let city = "";
+    if (parts.length >= 2) {
+      if (countryFoundInLastPart) {
+        // Country found in last part, city is second-to-last
+        // For 2 parts: "Street, Country" -> city would be parts[0], but this is unlikely
+        // For 3+ parts: city is parts[parts.length - 2]
+        city = parts.length >= 3 ? parts[parts.length - 2] : parts[0];
+      } else {
+        // No country detected, last part is likely the city
+        city = parts[parts.length - 1];
+      }
+    } else if (parts.length === 1) {
+      // Only one part, use it as city (fallback)
+      city = parts[0];
+    }
+    
     return {
       line1: parts[0] || "",
       line2: parts.length >= 3 ? parts[1] : "",
-      city: parts.length >= 2 ? parts[parts.length - 2] : parts[0] || "",
+      city: city,
       countryCode: countryCode,
       postCode: "",
     };
