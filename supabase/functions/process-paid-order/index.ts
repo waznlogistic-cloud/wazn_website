@@ -1,15 +1,22 @@
 /**
- * Tap Payments Webhook Handler
+ * Process Paid Order Edge Function
  * 
- * This Supabase Edge Function handles webhook events from Tap Payments.
- * When a payment is CAPTURED, it updates the order payment status and
- * triggers Aramex shipment creation.
+ * This Supabase Edge Function processes paid orders and creates Aramex/Mrsool shipments.
+ * It can be called by:
+ * - Database triggers (automatic when payment_status changes to 'paid')
+ * - Tap Payments webhook (tap-webhook function)
+ * - Manual retry mechanisms
+ * 
+ * This ensures 100% reliable shipment creation even if:
+ * - User closes their browser
+ * - Client-side processing fails
+ * - Webhook fails or times out
  * 
  * Deployment:
  * 1. Install Supabase CLI: npm install -g supabase
  * 2. Login: supabase login
  * 3. Link project: supabase link --project-ref your-project-ref
- * 4. Deploy: supabase functions deploy tap-webhook
+ * 4. Deploy: supabase functions deploy process-paid-order
  * 
  * Configuration:
  * Set the following secrets in Supabase Dashboard:
@@ -20,6 +27,8 @@
  * - ARAMEX_ACCOUNT_ENTITY
  * - ARAMEX_ACCOUNT_COUNTRY_CODE
  * - ARAMEX_API_URL (optional)
+ * - MRSOOL_API_KEY
+ * - MRSOOL_API_URL (optional)
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -31,45 +40,24 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-interface TapWebhookPayload {
-  id: string;
-  object: string;
-  api_version: string;
-  created: number;
-  data: {
-    object: {
-      id: string; // Charge ID
-      object: string;
-      amount: number;
-      currency: string;
-      status: string; // INITIATED, CAPTURED, FAILED, etc.
-      reference?: {
-        transaction?: string;
-        order?: string;
-      };
-      metadata?: Record<string, any>;
-    };
-  };
-  type: string;
-}
-
 interface Order {
   id: string;
-  tap_charge_id: string | null;
-  payment_status: string;
-  employer_id: string | null;
-  client_id: string | null;
-  ship_type: string;
-  sender_name: string;
-  sender_phone: string;
-  sender_address: string;
-  receiver_name: string;
-  receiver_phone: string;
-  receiver_address: string;
-  weight: number | null;
-  delivery_method: string | null;
-  aramex_shipment_id: string | null;
-  aramex_tracking_number: string | null;
+  status: string;
+  payment_status?: string;
+  provider_id?: string;
+  sender_name?: string;
+  sender_phone?: string;
+  sender_address?: string;
+  receiver_name?: string;
+  receiver_phone?: string;
+  receiver_address?: string;
+  weight?: number;
+  ship_type?: string;
+  employer_id?: string;
+  aramex_shipment_id?: string;
+  aramex_tracking_number?: string;
+  mrsool_order_id?: string;
+  mrsool_tracking_number?: string;
 }
 
 serve(async (req) => {
@@ -79,26 +67,41 @@ serve(async (req) => {
   }
 
   try {
-    // Get Supabase client with service role key
+    // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Parse webhook payload
-    const payload: TapWebhookPayload = await req.json();
-    const charge = payload.data.object;
+    // Parse request body
+    const body = await req.json();
+    const { order_id, triggered_by } = body;
 
-    console.log("Tap webhook received:", {
-      chargeId: charge.id,
-      status: charge.status,
-      reference: charge.reference,
-    });
+    if (!order_id) {
+      throw new Error("order_id is required");
+    }
 
-    // Only process CAPTURED payments
-    if (charge.status !== "CAPTURED") {
-      console.log(`Payment status is ${charge.status}, skipping processing`);
+    console.log(
+      `Processing paid order ${order_id} (triggered by: ${triggered_by || "unknown"})`
+    );
+
+    // Fetch the order
+    const { data: order, error: fetchError } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", order_id)
+      .single();
+
+    if (fetchError || !order) {
+      throw new Error(`Order ${order_id} not found: ${fetchError?.message}`);
+    }
+
+    // Verify payment status is 'paid'
+    if (order.payment_status !== "paid") {
       return new Response(
-        JSON.stringify({ message: `Status ${charge.status} ignored` }),
+        JSON.stringify({
+          message: `Order ${order_id} payment_status is not 'paid'`,
+          payment_status: order.payment_status,
+        }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
@@ -106,111 +109,12 @@ serve(async (req) => {
       );
     }
 
-    // Find order by tap_charge_id
-    const { data: orders, error: orderError } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("tap_charge_id", charge.id)
-      .limit(1);
-
-    if (orderError) {
-      console.error("Error fetching order:", orderError);
-      throw orderError;
-    }
-
-    if (!orders || orders.length === 0) {
-      console.warn(`No order found for tap_charge_id: ${charge.id}`);
-      return new Response(
-        JSON.stringify({ message: "Order not found" }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 404,
-        }
-      );
-    }
-
-    const order = orders[0] as Order;
-
-    // Check if payment is already processed
-    if (order.payment_status === "paid") {
-      console.log(`Order ${order.id} already marked as paid`);
-      
-      // Check if Aramex shipment already exists
-      if (order.aramex_shipment_id || order.aramex_tracking_number) {
-        console.log(`Order ${order.id} already has Aramex shipment`);
-        return new Response(
-          JSON.stringify({ message: "Order already processed" }),
-          {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200,
-          }
-        );
-      }
-    }
-
-    // Update order payment status to 'paid'
-    const { error: updateError } = await supabase
-      .from("orders")
-      .update({
-        payment_status: "paid",
-        paid_at: new Date().toISOString(),
-      })
-      .eq("id", order.id);
-
-    if (updateError) {
-      console.error("Error updating order payment status:", updateError);
-      throw updateError;
-    }
-
-    console.log(`Order ${order.id} payment status updated to 'paid'`);
-
-    // Refetch order to get latest data (including any Aramex shipment created by client-side)
-    const { data: refreshedOrder, error: refetchError } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("id", order.id)
-      .single();
-
-    if (refetchError) {
-      console.error("Error refetching order:", refetchError);
-      throw refetchError;
-    }
-
-    if (!refreshedOrder) {
-      throw new Error(`Order ${order.id} not found after payment update`);
-    }
-
-    // Process paid order (create Aramex/Mrsool shipment if applicable) with refreshed order data
-    // This function creates the shipment directly - no need to call external Edge Function
-    await processPaidOrder(supabase, refreshedOrder as Order);
-    
-    // Additionally, trigger the dedicated process-paid-order Edge Function as a backup
-    // This ensures shipment creation even if this webhook fails after updating payment_status
-    // The process-paid-order function will check if shipment already exists and skip if so
-    try {
-      const processPaidOrderUrl = `${supabaseUrl}/functions/v1/process-paid-order`;
-      await fetch(processPaidOrderUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${supabaseServiceKey}`,
-        },
-        body: JSON.stringify({
-          order_id: refreshedOrder.id,
-          triggered_by: "tap-webhook-backup",
-        }),
-      }).catch((err) => {
-        // Log but don't fail - shipment may have already been created above
-        console.warn(`Failed to trigger backup process-paid-order function:`, err);
-      });
-    } catch (backupError) {
-      // Log but don't fail - shipment creation above should have succeeded
-      console.warn(`Error calling backup process-paid-order function:`, backupError);
-    }
+    // Process the paid order (this will create Aramex/Mrsool shipment)
+    await processPaidOrder(supabase, order as Order);
 
     return new Response(
       JSON.stringify({
-        message: "Webhook processed successfully",
+        message: "Order processed successfully",
         orderId: order.id,
       }),
       {
@@ -219,7 +123,7 @@ serve(async (req) => {
       }
     );
   } catch (error: any) {
-    console.error("Webhook processing error:", error);
+    console.error("Error processing paid order:", error);
     return new Response(
       JSON.stringify({
         error: error.message || "Internal server error",

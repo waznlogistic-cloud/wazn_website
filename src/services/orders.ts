@@ -184,7 +184,7 @@ export async function processPaidOrder(orderId: string): Promise<Order | null> {
     order.mrsool_tracking_number;
 
   if (shipmentExists) {
-    const providerType = order.aramex_shipment_id || order.aramex_tracking_number ? "Aramex" : "Mrsool";
+    const providerType = (order.aramex_shipment_id || order.aramex_tracking_number) ? "Aramex" : "Mrsool";
     console.log(`Order ${orderId} already has ${providerType} shipment, skipping`);
     // Update status to 'new' if still pending (shipment already exists, so order is ready)
     if (order.status === "pending") {

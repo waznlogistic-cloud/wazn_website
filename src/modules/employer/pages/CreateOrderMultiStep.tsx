@@ -1072,11 +1072,11 @@ export default function CreateOrderMultiStep() {
           // Otherwise, look up in provider mapping
           const mappedProviderId = providerMapping[selectedProvider.id.toLowerCase()];
           if (!mappedProviderId) {
-            // Provider mapping failed - show error and prevent order creation
+            // Provider mapping failed - throw error with user-friendly message
+            // The outer catch block will display this message (avoiding duplicate messages)
             const errorMsg = providerMappingError || 
               `فشل العثور على معرف شركة الشحن المحددة (${selectedProvider.id}). يرجى تحديث الصفحة والمحاولة مرة أخرى.`;
-            message.error(errorMsg);
-            throw new Error(`Provider mapping failed for ${selectedProvider.id}`);
+            throw new Error(errorMsg);
           }
           return mappedProviderId;
         })(),
