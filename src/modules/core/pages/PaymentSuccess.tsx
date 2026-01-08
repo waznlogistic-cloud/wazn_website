@@ -85,6 +85,21 @@ export default function PaymentSuccess() {
             // Use the processed order if available (has updated status and shipment tracking data)
             if (processedOrder) {
               createdOrder = processedOrder;
+            } else {
+              // processPaidOrder returned null - likely payment_status wasn't "paid" yet
+              // This can happen due to race conditions or database synchronization issues
+              // Refetch the order to get the latest status
+              console.warn(`Order ${createdOrder.id}: processPaidOrder returned null, payment_status may not be 'paid' yet. Refetching order...`);
+              const { getOrderById } = await import("@/services/orders");
+              const refreshedOrder = await getOrderById(createdOrder.id);
+              if (refreshedOrder) {
+                createdOrder = refreshedOrder;
+                // If payment_status is now "paid", log a warning about potential retry needed
+                if (refreshedOrder.payment_status === "paid" && refreshedOrder.status === "pending") {
+                  console.warn(`Order ${createdOrder.id}: Payment is paid but order status is still 'pending'. Shipment creation may need retry.`);
+                  message.warning("تم إنشاء الطلب بنجاح. قد تحتاج الشحنة إلى إعادة المحاولة تلقائياً.");
+                }
+              }
             }
           } catch (processError: any) {
             // Log error but don't fail the flow - order is created, shipment can be retried

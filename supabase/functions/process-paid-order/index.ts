@@ -142,15 +142,20 @@ serve(async (req) => {
  */
 async function processPaidOrder(supabase: any, order: Order): Promise<void> {
   // Check if shipment already exists (Aramex or Mrsool) BEFORE status update
-  // If shipment exists, ensure status is 'new' and return early
+  // IMPORTANT: Exclude temporary lock values (IN_PROGRESS_*) from existence check
+  // Lock values indicate shipment creation is in progress, not that it's complete
+  const hasRealShipment = (value: string | null | undefined): boolean => {
+    return !!value && !value.startsWith("IN_PROGRESS_");
+  };
+  
   const shipmentExists =
-    order.aramex_shipment_id ||
-    order.aramex_tracking_number ||
-    order.mrsool_order_id ||
-    order.mrsool_tracking_number;
+    hasRealShipment(order.aramex_shipment_id) ||
+    hasRealShipment(order.aramex_tracking_number) ||
+    hasRealShipment(order.mrsool_order_id) ||
+    hasRealShipment(order.mrsool_tracking_number);
 
   if (shipmentExists) {
-    const providerType = (order.aramex_shipment_id || order.aramex_tracking_number) ? "Aramex" : "Mrsool";
+    const providerType = (hasRealShipment(order.aramex_shipment_id) || hasRealShipment(order.aramex_tracking_number)) ? "Aramex" : "Mrsool";
     console.log(`Order ${order.id} already has ${providerType} shipment, skipping`);
     // Ensure status is 'new' if shipment exists (shipment already created, so order is ready)
     if (order.status === "pending") {
@@ -283,12 +288,13 @@ async function processPaidOrder(supabase: any, order: Order): Promise<void> {
       .single();
     
     if (refreshedOrder) {
-      // Check if shipment was created
+      // Check if shipment was created (exclude lock values)
+      // IMPORTANT: Use hasRealShipment to filter out temporary lock values (IN_PROGRESS_*)
       if (
-        refreshedOrder.aramex_shipment_id ||
-        refreshedOrder.aramex_tracking_number ||
-        refreshedOrder.mrsool_order_id ||
-        refreshedOrder.mrsool_tracking_number
+        hasRealShipment(refreshedOrder.aramex_shipment_id) ||
+        hasRealShipment(refreshedOrder.aramex_tracking_number) ||
+        hasRealShipment(refreshedOrder.mrsool_order_id) ||
+        hasRealShipment(refreshedOrder.mrsool_tracking_number)
       ) {
         console.log(`Order ${order.id}: Shipment was created by another process`);
       }

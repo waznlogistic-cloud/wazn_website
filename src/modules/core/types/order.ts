@@ -1,4 +1,4 @@
-export type OrderStatus = "new" | "in_progress" | "delivered" | "canceled";
+export type OrderStatus = "pending" | "new" | "in_progress" | "delivered" | "canceled";
 
 export type Order = {
   id: string;

@@ -3,7 +3,7 @@ import { Form, Input, Radio, Button, Card, Space, message } from "antd";
 import { useNavigate } from "react-router-dom";
 import { CreditCardOutlined, AppleOutlined } from "@ant-design/icons";
 import { useAuth } from "@/contexts/authContext";
-import { createOrder } from "@/services/orders";
+import { createOrder, processPaidOrder } from "@/services/orders";
 
 export default function Wallet() {
   const { user } = useAuth();
@@ -35,7 +35,8 @@ export default function Wallet() {
       const shipmentData = JSON.parse(pendingShipment);
       
       // Create order after payment
-      await createOrder({
+      // IMPORTANT: Set payment_status to "paid" since wallet payment is completed
+      const createdOrder = await createOrder({
         client_id: user.id,
         provider_id: selectedProvider || undefined,
         ship_type: shipmentData.shipmentType || shipmentData.shipType || "standard",
@@ -48,7 +49,38 @@ export default function Wallet() {
         weight: shipmentData.weight,
         price: shipmentData.price || 15, // Default price if not set
         delivery_method: shipmentData.deliveryMethod,
+        payment_status: "paid", // Wallet payment is completed immediately
+        payment_amount: shipmentData.price || 15,
+        payment_currency: "SAR",
       });
+      
+      // Process paid order to create shipment (Aramex/Mrsool) if applicable
+      // This ensures shipments are created for wallet payments, just like Tap Payments flow
+      try {
+        const processedOrder = await processPaidOrder(createdOrder.id);
+        if (processedOrder) {
+          // Store the processed order with updated status and tracking info
+          sessionStorage.setItem("createdOrder", JSON.stringify({
+            ...processedOrder,
+            trackingNumber: processedOrder.aramex_tracking_number || processedOrder.mrsool_tracking_number || processedOrder.tracking_no,
+          }));
+        } else {
+          // If processPaidOrder returns null, store the created order
+          sessionStorage.setItem("createdOrder", JSON.stringify({
+            ...createdOrder,
+            trackingNumber: createdOrder.tracking_no,
+          }));
+        }
+      } catch (processError: any) {
+        // Log error but don't fail the flow - order is created, shipment can be retried
+        console.error("Failed to process paid order:", processError);
+        message.warning("تم إنشاء الطلب بنجاح، لكن فشل إنشاء الشحنة. سيتم إعادة المحاولة تلقائياً.");
+        // Store the created order even if shipment creation failed
+        sessionStorage.setItem("createdOrder", JSON.stringify({
+          ...createdOrder,
+          trackingNumber: createdOrder.tracking_no,
+        }));
+      }
       
       // Clear session storage
       sessionStorage.removeItem("pendingShipment");

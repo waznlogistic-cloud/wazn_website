@@ -45,6 +45,8 @@ export default function CreateOrderMultiStep() {
       try {
         setProviderMappingError(null);
         // Fetch providers that match external service names (case-insensitive)
+        // IMPORTANT: The providers table uses 'company_name' column, not 'name'
+        // We select both 'id' (UUID) and 'company_name' to create the mapping
         const { data: providers, error } = await supabase
           .from("providers")
           .select("id, company_name")
@@ -58,16 +60,44 @@ export default function CreateOrderMultiStep() {
         }
 
         // Create mapping from service identifier to provider UUID
+        // The mapping stores the actual UUID from the database (provider.id)
+        // which will be saved to the order's provider_id field
+        // IMPORTANT: If multiple providers of the same type exist, only the first one is used
         const mapping: Record<string, string> = {};
+        const providerCounts: Record<string, number> = { aramex: 0, mrsool: 0 };
+        
         if (providers) {
           for (const provider of providers) {
+            // Use company_name (not 'name') to identify the provider
+            // IMPORTANT: Null-check company_name before calling toUpperCase()
+            if (!provider.company_name) {
+              console.warn(`Provider ${provider.id} has null or undefined company_name, skipping`);
+              continue;
+            }
+            
             const companyNameUpper = provider.company_name.toUpperCase();
             if (companyNameUpper.includes("ARAMEX")) {
-              mapping["aramex"] = provider.id;
+              providerCounts.aramex++;
+              // Only save the first Aramex provider found (don't overwrite if already exists)
+              if (!mapping["aramex"]) {
+                mapping["aramex"] = provider.id;
+              }
             } else if (companyNameUpper.includes("MRSOOL")) {
-              mapping["mrsool"] = provider.id;
+              providerCounts.mrsool++;
+              // Only save the first Mrsool provider found (don't overwrite if already exists)
+              if (!mapping["mrsool"]) {
+                mapping["mrsool"] = provider.id;
+              }
             }
           }
+        }
+        
+        // Warn if multiple providers of the same type were found
+        if (providerCounts.aramex > 1) {
+          console.warn(`Found ${providerCounts.aramex} Aramex providers in database. Using the first one (ID: ${mapping["aramex"]}). Consider consolidating providers or implementing provider selection logic.`);
+        }
+        if (providerCounts.mrsool > 1) {
+          console.warn(`Found ${providerCounts.mrsool} Mrsool providers in database. Using the first one (ID: ${mapping["mrsool"]}). Consider consolidating providers or implementing provider selection logic.`);
         }
         setProviderMapping(mapping);
         
@@ -1062,14 +1092,15 @@ export default function CreateOrderMultiStep() {
         delivery_method: orderData.deliveryMethod || "standard",
         price: selectedProvider.price,
         // provider_id: Map to actual provider UUID from database
+        // IMPORTANT: This saves the real UUID from the providers table to provider_id
         // If selectedProvider.id is a UUID (internal provider), use it directly
-        // If it's an external service identifier (aramex, mrsool), look up the provider UUID
+        // If it's an external service identifier (aramex, mrsool), look up the provider UUID from the mapping
         provider_id: (() => {
           // Check if it's already a UUID
           if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedProvider.id)) {
             return selectedProvider.id;
           }
-          // Otherwise, look up in provider mapping
+          // Otherwise, look up in provider mapping (which contains UUIDs fetched from providers table)
           const mappedProviderId = providerMapping[selectedProvider.id.toLowerCase()];
           if (!mappedProviderId) {
             // Provider mapping failed - throw error with user-friendly message
@@ -1078,6 +1109,7 @@ export default function CreateOrderMultiStep() {
               `فشل العثور على معرف شركة الشحن المحددة (${selectedProvider.id}). يرجى تحديث الصفحة والمحاولة مرة أخرى.`;
             throw new Error(errorMsg);
           }
+          // Return the actual UUID from the providers table
           return mappedProviderId;
         })(),
         payment_amount: selectedProvider.price,
